@@ -1,7 +1,7 @@
 {
-    "name": "__app_name__",
-    "short_name": "__app_name__",
-    "description": "__app_description__",
+    "name": "chitter",
+    "short_name": "chitter",
+    "description": "A private chat app for your family and friends",
     "start_url": "/",
     "display": "standalone",
     "background_color": "#000c15",
