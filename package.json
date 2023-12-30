@@ -3,7 +3,7 @@
     "description": "A private chat app for your family and friends",
     "domain": "chitter.marioslab.io",
     "email": "badlogicgames@gmail.com",
-    "host": "marioslab.io",
+    "host": "slayer.marioslab.io",
     "hostDir": "/home/badlogic",
     "name": "chitter",
     "serverPort": 3333

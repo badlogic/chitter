@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 npm run build
-host=marioslab.io
+host=slayer.wmarioslab.io
 host_dir=/home/badlogic/chitter.marioslab.io
 current_date=$(date "+%Y-%m-%d %H:%M:%S")
 commit_hash=$(git rev-parse HEAD)
