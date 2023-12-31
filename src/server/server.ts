@@ -9,6 +9,7 @@ import multer from "multer";
 import WebSocket, { WebSocketServer } from "ws";
 import { Pool } from "pg";
 import { sleep } from "../utils/utils.js";
+import { ChitterDatabase } from "./database.js";
 const upload = multer({ storage: multer.memoryStorage() });
 
 const port = process.env.PORT ?? 3333;
@@ -36,11 +37,16 @@ const pool = new Pool({
     port: 5432,
 });
 
+const db = new ChitterDatabase(pool);
+
 (async () => {
     const result = await connectWithRetry(5, 3000);
     if (result instanceof Error) {
         process.exit(-1);
     }
+
+    await db.initialize(); // Initialize the database
+    console.log("Database initialized successfully");
 
     if (!fs.existsSync("docker/data")) {
         fs.mkdirSync("docker/data");
@@ -51,9 +57,27 @@ const pool = new Pool({
     app.use(cors());
     app.use(compression());
     app.use(bodyParser.urlencoded({ extended: true }));
+    app.use(express.json()); // Use express.json() instead of bodyParser for JSON payloads
 
-    app.get("/api/hello", (req, res) => {
-        res.json({ message: "Hello world" });
+    // Set up the first endpoint (e.g., createRoomAndAdmin)
+    app.post("/api/createRoomAndAdmin", async (req, res) => {
+        try {
+            const { roomName, adminName, adminInviteOnly } = req.body;
+            const result = await db.createRoomAndAdmin(roomName, adminName, adminInviteOnly);
+            res.json(result);
+        } catch (err) {
+            res.status(500).json(new Error("Unknown error"));
+        }
+    });
+
+    app.post("/api/getChannels", async (req, res) => {
+        try {
+            const { token } = req.body;
+            const result = await db.getChannels(token);
+            res.json(result);
+        } catch (err) {
+            res.status(500).json(new Error("Unknown error"));
+        }
     });
 
     const server = http.createServer(app);
