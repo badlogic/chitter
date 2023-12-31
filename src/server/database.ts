@@ -1,6 +1,8 @@
 import { Pool } from "pg";
+import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
 import {
+    Attachment,
     Channel,
     ChitterError,
     Embed,
@@ -9,6 +11,8 @@ import {
     ErrorCreateInviteCode,
     ErrorCreateMessage,
     ErrorCreateRoomAndAdmin,
+    ErrorCreateTransferBundleFromCode,
+    ErrorCreateTransferCode,
     ErrorCreateUserFromInviteCode,
     ErrorEditMessage,
     ErrorGetChannels,
@@ -16,6 +20,7 @@ import {
     ErrorGetUser,
     ErrorGetUsers,
     ErrorReason,
+    ErrorRemoveAttachment,
     ErrorRemoveChannel,
     ErrorRemoveMessage,
     ErrorRemoveUser,
@@ -24,6 +29,7 @@ import {
     ErrorUpdateChannel,
     ErrorUpdateRoom,
     ErrorUpdateUser,
+    ErrorUploadAttachment,
     Facet,
     Message,
     Room,
@@ -34,12 +40,14 @@ import {
 
 export class ChitterDatabase {
     private pool: Pool;
-    private inviteCodes: Map<string, { roomId: string; createdAt: Date }>;
+    private inviteCodes: Map<string, { roomId: string; expiresAt: Date }>;
+    private transferCodes: Map<string, { userIds: string[]; expiresAt: Date }>;
 
     constructor(pool: Pool) {
         this.pool = pool;
         this.inviteCodes = new Map();
-        setInterval(() => this.cleanupInviteCodes(), 3600000); // Cleanup every hour
+        this.transferCodes = new Map();
+        setInterval(() => this.cleanupCodes(), 3600000); // Cleanup every hour
     }
 
     async initialize(): Promise<ChitterError<Extract<ErrorReason, "Could not create tables">> | void> {
@@ -106,6 +114,7 @@ export class ChitterDatabase {
               type TEXT NOT NULL CHECK (type IN ('image', 'video', 'file')),
               user_id UUID,
               file_name TEXT NOT NULL,
+              path TEXT NOT NULL,
               width INT,
               height INT,
               created_at TIMESTAMPTZ NOT NULL
@@ -173,10 +182,19 @@ export class ChitterDatabase {
         }
     }
 
-    private cleanupInviteCodes() {
-        const oneDayAgo = new Date(Date.now() - 86400000); // 24 hours in milliseconds
+    private cleanupCodes() {
+        const now = new Date();
+
+        // Cleanup transfer codes (expire after 1 hour)
+        this.transferCodes.forEach((value, key) => {
+            if (value.expiresAt < now) {
+                this.transferCodes.delete(key);
+            }
+        });
+
+        // Cleanup invite codes (expire after 24 hours)
         this.inviteCodes.forEach((value, key) => {
-            if (value.createdAt < oneDayAgo) {
+            if (value.expiresAt < now) {
                 this.inviteCodes.delete(key);
             }
         });
@@ -202,7 +220,8 @@ export class ChitterDatabase {
             }
 
             const inviteCode = uuidv4(); // Generate a UUID
-            this.inviteCodes.set(inviteCode, { roomId: user.room_id, createdAt: new Date() });
+            const expiresAt = new Date(Date.now() + 86400000); // 24 hours from now
+            this.inviteCodes.set(inviteCode, { roomId: user.room_id, expiresAt });
 
             return inviteCode;
         } catch (e) {
@@ -300,6 +319,65 @@ export class ChitterDatabase {
         } catch (e) {
             await client.query("ROLLBACK");
             return new ChitterError("Could not remove user", e);
+        } finally {
+            client.release();
+        }
+    }
+
+    async createTransferCode(userTokens: string[]): Promise<ErrorCreateTransferCode | string> {
+        const client = await this.pool.connect();
+        try {
+            const userQuery = `SELECT id FROM users WHERE token = ANY($1::text[]);`;
+            const userResult = await client.query(userQuery, [userTokens]);
+
+            // Extract valid user IDs
+            const validUserIds = userResult.rows.map((row) => row.id);
+
+            // Proceed only if there's at least one valid token
+            if (validUserIds.length === 0) {
+                return new ChitterError("No valid tokens");
+            }
+
+            const transferCode = uuidv4();
+            const expiresAt = new Date(Date.now() + 3600000); // 1 hour from now
+
+            this.transferCodes.set(transferCode, { userIds: validUserIds, expiresAt });
+
+            return transferCode;
+        } catch (e) {
+            return new ChitterError("Could not create transfer code", e);
+        } finally {
+            client.release();
+        }
+    }
+
+    async createTransferBundleFromCode(transferCode: string): Promise<ErrorCreateTransferBundleFromCode | User[]> {
+        const transferData = this.transferCodes.get(transferCode);
+        if (!transferData || transferData.expiresAt < new Date()) {
+            return new ChitterError("Invalid or expired transfer code");
+        }
+
+        const client = await this.pool.connect();
+        try {
+            const usersQuery = `SELECT id, room_id, created_at, token, display_name, description, avatar_id, role FROM users WHERE id = ANY($1::uuid[]);`;
+            const usersResult = await client.query(usersQuery, [transferData.userIds]);
+
+            const users = usersResult.rows.map((row) => ({
+                id: row.id,
+                roomId: row.room_id,
+                createdAt: row.created_at,
+                token: row.token,
+                displayName: row.display_name,
+                description: row.description,
+                avatar: row.avatar_id,
+                role: row.role,
+            }));
+
+            this.transferCodes.delete(transferCode);
+
+            return users;
+        } catch (e) {
+            return new ChitterError("Could not fetch user data from transfer code", e);
         } finally {
             client.release();
         }
@@ -1000,6 +1078,94 @@ export class ChitterDatabase {
         } catch (e) {
             await client.query("ROLLBACK");
             return new ChitterError("Could not remove user from channel", e);
+        } finally {
+            client.release();
+        }
+    }
+
+    async uploadAttachment(
+        token: string,
+        attachment: {
+            type: "image" | "video" | "file";
+            fileName: string;
+            path: string;
+            width?: number;
+            height?: number;
+            createdAt: number;
+        }
+    ): Promise<Attachment | ErrorUploadAttachment> {
+        const client = await this.pool.connect();
+
+        try {
+            // Validate the user token and get the user ID
+            const userQuery = `SELECT id FROM users WHERE token = $1;`;
+            const userResult = await client.query(userQuery, [token]);
+
+            if (userResult.rowCount === 0) {
+                throw new ChitterError("Invalid token");
+            }
+
+            const userId = userResult.rows[0].id;
+
+            // Insert attachment data into the database
+            const insertQuery = `
+                INSERT INTO attachments (id, type, user_id, file_name, path, width, height, created_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, TO_TIMESTAMP($8))
+                RETURNING id, type, user_id, file_name, path, width, height, created_at;
+            `;
+            const insertValues = [
+                uuidv4(),
+                attachment.type,
+                userId,
+                attachment.fileName,
+                attachment.path,
+                attachment.width,
+                attachment.height,
+                attachment.createdAt / 1000, // Convert from milliseconds to seconds
+            ];
+            const insertResult = await client.query(insertQuery, insertValues);
+
+            return insertResult.rows[0] as Attachment; // Assuming Attachment matches the table structure
+        } catch (e) {
+            throw new ChitterError("Could not upload attachment", e);
+        } finally {
+            client.release();
+        }
+    }
+
+    async removeAttachment(token: string, attachmentId: string): Promise<void | ErrorRemoveAttachment> {
+        const client = await this.pool.connect();
+
+        try {
+            // Validate the user token and get the user ID
+            const userQuery = `SELECT id FROM users WHERE token = $1;`;
+            const userResult = await client.query(userQuery, [token]);
+            if (userResult.rowCount === 0) {
+                throw new ChitterError("Invalid token");
+            }
+
+            const userId = userResult.rows[0].id;
+
+            // Get the attachment to verify ownership and get file path
+            const attachmentQuery = `SELECT * FROM attachments WHERE id = $1 AND user_id = $2;`;
+            const attachmentResult = await client.query(attachmentQuery, [attachmentId, userId]);
+
+            if (attachmentResult.rowCount === 0) {
+                throw new ChitterError("Attachment not found");
+            }
+
+            const attachment = attachmentResult.rows[0];
+
+            // Delete the file from the filesystem
+            if (fs.existsSync(attachment.path)) {
+                fs.unlinkSync(attachment.path);
+            }
+
+            // Delete the attachment record from the database
+            const deleteQuery = `DELETE FROM attachments WHERE id = $1;`;
+            await client.query(deleteQuery, [attachmentId]);
+        } catch (e) {
+            throw new ChitterError("Could not remove attachment", e);
         } finally {
             client.release();
         }
