@@ -64,7 +64,7 @@ export type MessageContent = {
 
 export interface Message {
     id: number;
-    user: User;
+    user: UserBasic;
     createdAt: UtcTimestamp;
     content: MessageContent;
     channelId?: UUID;
@@ -76,6 +76,7 @@ export interface Attachment {
     id: UUID;
     userId: string;
     fileName: string;
+    path: string;
     width?: number;
     height?: number;
     createdAt: UtcTimestamp;
@@ -137,7 +138,11 @@ export type ErrorReason =
     | "Unexpected error"
     | "Unknown server error"
     | "Invalid parameters"
-    | "Invalid file type";
+    | "Invalid file type"
+    | "Room not found"
+    | "Could not retrieve room details"
+    | "Could not retrieve channel details"
+    | "Channel not found";
 
 export class ChitterError<T extends ErrorReason> extends Error {
     constructor(readonly reason: T, readonly e?: any) {
@@ -154,7 +159,7 @@ export type ErrorSanitizeMessageContent = Extract<
 export type SuccessCreateRoomAndAdmin = { room: Room; admin: User; generalChannel: Channel };
 export type ErrorCreateRoomAndAdmin = Extract<ErrorReason, "Could not create room and admin">;
 
-export type SuccessCreateInviteCode = string;
+export type SuccessCreateInviteCode = { inviteCode: string };
 export type ErrorCreateInviteCode = Extract<
     ErrorReason,
     "User not found" | "User is not an admin and room is admin invite only" | "Could not create invite code"
@@ -169,7 +174,7 @@ export type ErrorCreateUserFromInviteCode = Extract<
 export type SuccessRemoveUser = void;
 export type ErrorRemoveUser = Extract<ErrorReason, "Invalid admin token" | "User not found in admin's room" | "Could not remove user">;
 
-export type SuccessCreateTransferBundle = string;
+export type SuccessCreateTransferBundle = { transferCode: string };
 export type ErrorCreateTransferBundle = Extract<ErrorReason, "No valid tokens" | "Could not create transfer code">;
 
 export type SuccessGetTransferBundleFromCode = User[];
@@ -178,7 +183,7 @@ export type ErrorGetTransferBundleFromCode = Extract<
     "Invalid or expired transfer code" | "Could not fetch user data from transfer code"
 >;
 
-export type SuccessCreateMessage = number;
+export type SuccessCreateMessage = { messageId: number };
 export type ErrorCreateMessage = Extract<
     ErrorReason,
     | "Invalid user token"
@@ -238,13 +243,19 @@ export type ErrorGetMessages = Extract<
 export type SuccessGetUsers = UserBasic[];
 export type ErrorGetUsers = Extract<ErrorReason, "Invalid user token" | "Could not get users">;
 
+export type SuccessGetRoom = Room;
+export type ErrorGetRoom = Extract<ErrorReason, "Invalid user token" | "Room not found" | "Could not retrieve room details">;
+
 export type SuccessGetUser = UserBasic;
 export type ErrorGetUser = Extract<ErrorReason, "Invalid user token" | "User not found" | "Could not retrieve user details">;
 
 export type SuccessGetChannels = Channel[];
 export type ErrorGetChannels = Extract<ErrorReason, "Invalid user token" | "Could not retrieve channels">;
 
-export type SuccessCreateChannel = UUID;
+export type SuccessGetChannel = Channel;
+export type ErrorGetChannel = Extract<ErrorReason, "Invalid user token" | "Channel not found" | "Could not retrieve channel details">;
+
+export type SuccessCreateChannel = { channelId: UUID };
 export type ErrorCreateChannel = Extract<ErrorReason, "Invalid admin token or non-admin user" | "Could not create channel">;
 
 export type SuccessRemoveChannel = void;

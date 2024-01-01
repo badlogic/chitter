@@ -8,7 +8,7 @@ import * as http from "http";
 import WebSocket, { WebSocketServer } from "ws";
 import { Pool } from "pg";
 import { sleep } from "../utils/utils";
-import { PostgresChitterDatabase } from "./database-postgres";
+import { PostgresChitterDatabase } from "./chitter-postgres";
 import {
     ChitterError,
     ErrorAddUserToChannel,
@@ -19,8 +19,10 @@ import {
     ErrorCreateTransferBundle,
     ErrorCreateUserFromInviteCode,
     ErrorEditMessage,
+    ErrorGetChannel,
     ErrorGetChannels,
     ErrorGetMessages,
+    ErrorGetRoom,
     ErrorGetTransferBundleFromCode,
     ErrorGetUser,
     ErrorGetUsers,
@@ -43,8 +45,10 @@ import {
     SuccessCreateTransferBundle,
     SuccessCreateUserFromInviteCode,
     SuccessEditMessage,
+    SuccessGetChannel,
     SuccessGetChannels,
     SuccessGetMessages,
+    SuccessGetRoom,
     SuccessGetTransferBundleFromCode,
     SuccessGetUser,
     SuccessGetUsers,
@@ -437,6 +441,27 @@ export async function createApp(
         }
     );
 
+    app.get(
+        "/api/getRoom",
+        [header("authorization").notEmpty(), query("roomId").isString().trim().notEmpty()],
+        async (req: Request, res: Response) => {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) return apiError(res, "Invalid parameters", errors.array());
+
+            try {
+                const token = req.headers.authorization!;
+                const { roomId } = req.query;
+                const result = await db.getRoom(token, roomId as string);
+
+                if (result instanceof ChitterError) return apiError<ErrorGetRoom>(res, result.reason);
+                apiSuccess<SuccessGetRoom>(res, result);
+            } catch (err) {
+                console.error(err);
+                apiError(res, "Unknown server error");
+            }
+        }
+    );
+
     app.get("/api/getUsers", [header("authorization").notEmpty(), query("channelId").optional().isString()], async (req: Request, res: Response) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
@@ -493,6 +518,28 @@ export async function createApp(
             apiError(res, "Unknown server error");
         }
     });
+
+    app.get(
+        "/api/getChannel",
+        [header("authorization").notEmpty(), query("channelId").isString().trim().notEmpty()],
+        async (req: Request, res: Response) => {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                return apiError(res, "Invalid parameters", errors.array());
+            }
+
+            try {
+                const token = req.headers.authorization!;
+                const { channelId } = req.query;
+                const result = await db.getChannel(token, channelId as string);
+                if (result instanceof ChitterError) return apiError<ErrorGetChannel>(res, result.reason);
+                apiSuccess<SuccessGetChannel>(res, result);
+            } catch (err) {
+                console.error(err);
+                apiError(res, "Unknown server error");
+            }
+        }
+    );
 
     app.post(
         "/api/createChannel",
@@ -632,7 +679,6 @@ export async function createApp(
                 path: filePath,
                 width,
                 height,
-                createdAt: Date.now(),
             });
 
             if (attachment instanceof ChitterError) {

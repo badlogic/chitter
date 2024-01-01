@@ -8,8 +8,10 @@ import {
     ErrorCreateTransferBundle,
     ErrorCreateUserFromInviteCode,
     ErrorEditMessage,
+    ErrorGetChannel,
     ErrorGetChannels,
     ErrorGetMessages,
+    ErrorGetRoom,
     ErrorGetTransferBundleFromCode,
     ErrorGetUser,
     ErrorGetUsers,
@@ -34,8 +36,10 @@ import {
     SuccessCreateTransferBundle,
     SuccessCreateUserFromInviteCode,
     SuccessEditMessage,
+    SuccessGetChannel,
     SuccessGetChannels,
     SuccessGetMessages,
+    SuccessGetRoom,
     SuccessGetTransferBundleFromCode,
     SuccessGetUser,
     SuccessGetUsers,
@@ -110,6 +114,8 @@ export function toUrlBody(params: JsonValue) {
             urlParams.append(key, value.toString());
         } else if (typeof value == "object") {
             urlParams.append(key, JSON.stringify(value));
+        } else if (value == undefined) {
+            // Ignore
         } else {
             throw new Error("Unsupported value type: " + typeof value);
         }
@@ -130,6 +136,34 @@ export class Api {
         } catch (e) {
             error("Could not create room and admin", e);
             return { success: false, error: "Could not create room and admin" };
+        }
+    }
+
+    static async updateRoom(
+        token: string,
+        displayName: string,
+        adminInviteOnly: boolean,
+        description?: string,
+        logoId?: string
+    ): Promise<ApiResponse<SuccessUpdateRoom, ErrorUpdateRoom>> {
+        try {
+            const params = toUrlBody({ displayName, adminInviteOnly, description, logoId });
+            const result = await apiPost<SuccessUpdateRoom, ErrorUpdateRoom>("updateRoom", params, token);
+            return result;
+        } catch (e) {
+            error("Could not update room", e);
+            return { success: false, error: "Could not update room" };
+        }
+    }
+
+    static async getRoom(token: string, roomId: string): Promise<ApiResponse<SuccessGetRoom, ErrorGetRoom>> {
+        try {
+            const endpoint = `getRoom?roomId=${encodeURIComponent(roomId)}`;
+            const result = await apiGet<SuccessGetRoom, ErrorGetRoom>(endpoint, token);
+            return result;
+        } catch (e) {
+            error("Room not found", e);
+            return { success: false, error: "Room not found" };
         }
     }
 
@@ -168,6 +202,59 @@ export class Api {
         }
     }
 
+    static async updateUser(
+        token: string,
+        displayName?: string,
+        description?: string,
+        avatar?: string
+    ): Promise<ApiResponse<SuccessUpdateUser, ErrorUpdateUser>> {
+        try {
+            const params = toUrlBody({ displayName, description, avatar });
+            const result = await apiPost<SuccessUpdateUser, ErrorUpdateUser>("updateUser", params, token);
+            return result;
+        } catch (e) {
+            error("Could not update user", e);
+            return { success: false, error: "Could not update user" };
+        }
+    }
+
+    static async setUserRole(
+        token: string,
+        userId: string,
+        role: "admin" | "participant"
+    ): Promise<ApiResponse<SuccessSetUserRole, ErrorSetUserRole>> {
+        try {
+            const params = toUrlBody({ userId, role });
+            const result = await apiPost<SuccessSetUserRole, ErrorSetUserRole>("setUserRole", params, token);
+            return result;
+        } catch (e) {
+            error("Could not set change role", e);
+            return { success: false, error: "Could not change user role" };
+        }
+    }
+
+    static async getUsers(token: string, channelId?: string): Promise<ApiResponse<SuccessGetUsers, ErrorGetUsers>> {
+        try {
+            const endpoint = channelId ? `getUsers?channelId=${encodeURIComponent(channelId)}` : "getUsers";
+            const result = await apiGet<SuccessGetUsers, ErrorGetUsers>(endpoint, token);
+            return result;
+        } catch (e) {
+            error("Could not get users", e);
+            return { success: false, error: "Could not get users" };
+        }
+    }
+
+    static async getUser(token: string, userId: string): Promise<ApiResponse<SuccessGetUser, ErrorGetUser>> {
+        try {
+            const endpoint = `getUser?userId=${encodeURIComponent(userId)}`;
+            const result = await apiGet<SuccessGetUser, ErrorGetUser>(endpoint, token);
+            return result;
+        } catch (e) {
+            error("User not found", e);
+            return { success: false, error: "User not found" };
+        }
+    }
+
     static async createTransferBundle(
         token: string,
         userTokens: string[]
@@ -182,7 +269,7 @@ export class Api {
         }
     }
 
-    static async createTransferBundleFromCode(
+    static async getTransferBundleFromCode(
         transferCode: string
     ): Promise<ApiResponse<SuccessGetTransferBundleFromCode, ErrorGetTransferBundleFromCode>> {
         try {
@@ -233,54 +320,6 @@ export class Api {
         }
     }
 
-    static async updateRoom(
-        token: string,
-        displayName: string,
-        adminInviteOnly: boolean,
-        description?: string,
-        logoId?: string
-    ): Promise<ApiResponse<SuccessUpdateRoom, ErrorUpdateRoom>> {
-        try {
-            const params = toUrlBody({ displayName, adminInviteOnly, description, logoId });
-            const result = await apiPost<SuccessUpdateRoom, ErrorUpdateRoom>("updateRoom", params, token);
-            return result;
-        } catch (e) {
-            error("Could not update room", e);
-            return { success: false, error: "Could not update room" };
-        }
-    }
-
-    static async updateUser(
-        token: string,
-        displayName?: string,
-        description?: string,
-        avatar?: string
-    ): Promise<ApiResponse<SuccessUpdateUser, ErrorUpdateUser>> {
-        try {
-            const params = toUrlBody({ displayName, description, avatar });
-            const result = await apiPost<SuccessUpdateUser, ErrorUpdateUser>("updateUser", params, token);
-            return result;
-        } catch (e) {
-            error("Could not update user", e);
-            return { success: false, error: "Could not update user" };
-        }
-    }
-
-    static async setUserRole(
-        token: string,
-        userId: string,
-        role: "admin" | "participant"
-    ): Promise<ApiResponse<SuccessSetUserRole, ErrorSetUserRole>> {
-        try {
-            const params = toUrlBody({ userId, role });
-            const result = await apiPost<SuccessSetUserRole, ErrorSetUserRole>("setUserRole", params, token);
-            return result;
-        } catch (e) {
-            error("Could not set change role", e);
-            return { success: false, error: "Could not change user role" };
-        }
-    }
-
     static async getMessages(
         token: string,
         channelId?: string,
@@ -302,39 +341,6 @@ export class Api {
         } catch (e) {
             error("Could not get messages", e);
             return { success: false, error: "Could not get messages" };
-        }
-    }
-
-    static async getUsers(token: string, channelId?: string): Promise<ApiResponse<SuccessGetUsers, ErrorGetUsers>> {
-        try {
-            const endpoint = channelId ? `getUsers?channelId=${encodeURIComponent(channelId)}` : "getUsers";
-            const result = await apiGet<SuccessGetUsers, ErrorGetUsers>(endpoint, token);
-            return result;
-        } catch (e) {
-            error("Could not get users", e);
-            return { success: false, error: "Could not get users" };
-        }
-    }
-
-    static async getUser(token: string, userId: string): Promise<ApiResponse<SuccessGetUser, ErrorGetUser>> {
-        try {
-            const endpoint = `getUser?userId=${encodeURIComponent(userId)}`;
-            const result = await apiGet<SuccessGetUser, ErrorGetUser>(endpoint, token);
-            return result;
-        } catch (e) {
-            error("User not found", e);
-            return { success: false, error: "User not found" };
-        }
-    }
-
-    static async getChannels(token: string): Promise<ApiResponse<SuccessGetChannels, ErrorGetChannels>> {
-        try {
-            const endpoint = `getChannels`;
-            const result = await apiGet<SuccessGetChannels, ErrorGetChannels>(endpoint, token);
-            return result;
-        } catch (e) {
-            error("Could not retrieve channels", e);
-            return { success: false, error: "Could not retrieve channels" };
         }
     }
 
@@ -377,6 +383,28 @@ export class Api {
         } catch (e) {
             error("Could not update channel", e);
             return { success: false, error: "Could not update channel" };
+        }
+    }
+
+    static async getChannels(token: string): Promise<ApiResponse<SuccessGetChannels, ErrorGetChannels>> {
+        try {
+            const endpoint = `getChannels`;
+            const result = await apiGet<SuccessGetChannels, ErrorGetChannels>(endpoint, token);
+            return result;
+        } catch (e) {
+            error("Could not retrieve channels", e);
+            return { success: false, error: "Could not retrieve channels" };
+        }
+    }
+
+    static async getChannel(token: string, channelId: string): Promise<ApiResponse<SuccessGetChannel, ErrorGetChannel>> {
+        try {
+            const endpoint = `getChannel?channelId=${encodeURIComponent(channelId)}`;
+            const result = await apiGet<SuccessGetChannel, ErrorGetChannel>(endpoint, token);
+            return result;
+        } catch (e) {
+            error("Could not retrieve channels", e);
+            return { success: false, error: "Could not retrieve channel details" };
         }
     }
 
