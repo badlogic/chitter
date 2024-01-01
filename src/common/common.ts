@@ -20,15 +20,18 @@ export interface Channel {
     createdBy: UUID;
 }
 
-export interface User {
+export interface UserBasic {
     id: UUID;
-    roomId?: UUID;
-    createdAt?: UtcTimestamp;
-    token?: string;
+    roomId: UUID;
+    createdAt: UtcTimestamp;
     displayName: string;
     description?: string;
     avatar?: UUID;
     role: "admin" | "participant";
+}
+
+export interface User extends UserBasic {
+    token: string;
 }
 
 export interface Facet {
@@ -232,10 +235,10 @@ export type ErrorGetMessages = Extract<
     | "Channel not found in user's room"
 >;
 
-export type SuccessGetUsers = User[];
+export type SuccessGetUsers = UserBasic[];
 export type ErrorGetUsers = Extract<ErrorReason, "Invalid user token" | "Could not get users">;
 
-export type SuccessGetUser = User;
+export type SuccessGetUser = UserBasic;
 export type ErrorGetUser = Extract<ErrorReason, "Invalid user token" | "User not found" | "Could not retrieve user details">;
 
 export type SuccessGetChannels = Channel[];
