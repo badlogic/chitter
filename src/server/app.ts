@@ -272,7 +272,7 @@ export async function createApp(
         "/api/createMessage",
         [
             header("authorization").notEmpty(),
-            body("content").notEmpty(),
+            body("content").notEmpty().isObject(),
             body("channelId").optional().isString(),
             body("directMessageUserId").optional().isString(),
         ],
@@ -429,7 +429,7 @@ export async function createApp(
                     channelId as string,
                     directMessageUserId as string,
                     cursor as string,
-                    parseInt(limit as string)
+                    limit ? parseInt(limit as string) : undefined
                 );
 
                 if (result instanceof ChitterError) return apiError<ErrorGetMessages>(res, result.reason);

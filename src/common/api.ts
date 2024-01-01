@@ -77,7 +77,7 @@ export async function apiGet<T, E extends ErrorReason = ErrorReason>(
 
 export async function apiPost<T, E extends ErrorReason = ErrorReason>(
     endpoint: string,
-    params: URLSearchParams | FormData,
+    params: URLSearchParams | FormData | any,
     token?: string
 ): Promise<ApiResponse<T, E | "Unknown server error">> {
     let headers: HeadersInit = {};
@@ -86,8 +86,11 @@ export async function apiPost<T, E extends ErrorReason = ErrorReason>(
     if (params instanceof URLSearchParams) {
         headers = { "Content-Type": "application/x-www-form-urlencoded" };
         body = params.toString();
-    } else {
+    } else if (params instanceof FormData) {
         body = params;
+    } else {
+        body = JSON.stringify(params);
+        headers = { ...headers, "Content-Type": "application/json" };
     }
 
     if (token) headers = { ...headers, Authorization: token };
@@ -105,24 +108,6 @@ export async function apiPost<T, E extends ErrorReason = ErrorReason>(
     }
 }
 
-export function toUrlBody(params: JsonValue) {
-    const urlParams = new URLSearchParams();
-    for (const key in params) {
-        const value = params[key];
-        const type = typeof value;
-        if (type == "string" || type == "number" || type == "boolean") {
-            urlParams.append(key, value.toString());
-        } else if (typeof value == "object") {
-            urlParams.append(key, JSON.stringify(value));
-        } else if (value == undefined) {
-            // Ignore
-        } else {
-            throw new Error("Unsupported value type: " + typeof value);
-        }
-    }
-    return urlParams;
-}
-
 export class Api {
     static async createRoomAndAdmin(
         roomName: string,
@@ -130,7 +115,7 @@ export class Api {
         adminInviteOnly: boolean
     ): Promise<ApiResponse<SuccessCreateRoomAndAdmin, ErrorCreateRoomAndAdmin>> {
         try {
-            const params = toUrlBody({ roomName, adminName, adminInviteOnly });
+            const params = { roomName, adminName, adminInviteOnly };
             const result = await apiPost<SuccessCreateRoomAndAdmin, ErrorCreateRoomAndAdmin>("createRoomAndAdmin", params);
             return result;
         } catch (e) {
@@ -147,7 +132,7 @@ export class Api {
         logoId?: string
     ): Promise<ApiResponse<SuccessUpdateRoom, ErrorUpdateRoom>> {
         try {
-            const params = toUrlBody({ displayName, adminInviteOnly, description, logoId });
+            const params = { displayName, adminInviteOnly, description, logoId };
             const result = await apiPost<SuccessUpdateRoom, ErrorUpdateRoom>("updateRoom", params, token);
             return result;
         } catch (e) {
@@ -182,7 +167,7 @@ export class Api {
         displayName: string
     ): Promise<ApiResponse<SuccessCreateUserFromInviteCode, ErrorCreateUserFromInviteCode>> {
         try {
-            const params = toUrlBody({ inviteCode, displayName });
+            const params = { inviteCode, displayName };
             const result = await apiPost<SuccessCreateUserFromInviteCode, ErrorCreateUserFromInviteCode>("createUserFromInviteCode", params);
             return result;
         } catch (e) {
@@ -193,7 +178,7 @@ export class Api {
 
     static async removeUser(token: string, userId: string): Promise<ApiResponse<SuccessRemoveUser, ErrorRemoveUser>> {
         try {
-            const params = toUrlBody({ userId });
+            const params = { userId };
             const result = await apiPost<SuccessRemoveUser, ErrorRemoveUser>("removeUser", params, token);
             return result;
         } catch (e) {
@@ -209,7 +194,7 @@ export class Api {
         avatar?: string
     ): Promise<ApiResponse<SuccessUpdateUser, ErrorUpdateUser>> {
         try {
-            const params = toUrlBody({ displayName, description, avatar });
+            const params = { displayName, description, avatar };
             const result = await apiPost<SuccessUpdateUser, ErrorUpdateUser>("updateUser", params, token);
             return result;
         } catch (e) {
@@ -224,7 +209,7 @@ export class Api {
         role: "admin" | "participant"
     ): Promise<ApiResponse<SuccessSetUserRole, ErrorSetUserRole>> {
         try {
-            const params = toUrlBody({ userId, role });
+            const params = { userId, role };
             const result = await apiPost<SuccessSetUserRole, ErrorSetUserRole>("setUserRole", params, token);
             return result;
         } catch (e) {
@@ -260,7 +245,7 @@ export class Api {
         userTokens: string[]
     ): Promise<ApiResponse<SuccessCreateTransferBundle, ErrorCreateTransferBundle>> {
         try {
-            const params = toUrlBody({ userTokens });
+            const params = { userTokens };
             const result = await apiPost<SuccessCreateTransferBundle, ErrorCreateTransferBundle>("createTransferBundle", params, token);
             return result;
         } catch (e) {
@@ -273,7 +258,7 @@ export class Api {
         transferCode: string
     ): Promise<ApiResponse<SuccessGetTransferBundleFromCode, ErrorGetTransferBundleFromCode>> {
         try {
-            const params = toUrlBody({ transferCode });
+            const params = { transferCode };
             const result = await apiPost<SuccessGetTransferBundleFromCode, ErrorGetTransferBundleFromCode>("getTransferBundleFromCode", params);
             return result;
         } catch (e) {
@@ -289,7 +274,7 @@ export class Api {
         directMessageUserId?: string
     ): Promise<ApiResponse<SuccessCreateMessage, ErrorCreateMessage>> {
         try {
-            const params = toUrlBody({ content, channelId, directMessageUserId });
+            const params = { content, channelId, directMessageUserId };
             const result = await apiPost<SuccessCreateMessage, ErrorCreateMessage>("createMessage", params, token);
             return result;
         } catch (e) {
@@ -300,7 +285,7 @@ export class Api {
 
     static async removeMessage(token: string, messageId: string): Promise<ApiResponse<SuccessRemoveMessage, ErrorRemoveMessage>> {
         try {
-            const params = toUrlBody({ messageId });
+            const params = { messageId };
             const result = await apiPost<SuccessRemoveMessage, ErrorRemoveMessage>("removeMessage", params, token);
             return result;
         } catch (e) {
@@ -311,7 +296,7 @@ export class Api {
 
     static async editMessage(token: string, messageId: string, content: MessageContent): Promise<ApiResponse<SuccessEditMessage, ErrorEditMessage>> {
         try {
-            const params = toUrlBody({ messageId, content });
+            const params = { messageId, content };
             const result = await apiPost<SuccessEditMessage, ErrorEditMessage>("editMessage", params, token);
             return result;
         } catch (e) {
@@ -350,7 +335,7 @@ export class Api {
         isPrivate: boolean
     ): Promise<ApiResponse<SuccessCreateChannel, ErrorCreateChannel>> {
         try {
-            const params = toUrlBody({ displayName, isPrivate });
+            const params = { displayName, isPrivate };
             const result = await apiPost<SuccessCreateChannel, ErrorCreateChannel>("createChannel", params, token);
             return result;
         } catch (e) {
@@ -361,7 +346,7 @@ export class Api {
 
     static async removeChannel(token: string, channelId: string): Promise<ApiResponse<SuccessRemoveChannel, ErrorRemoveChannel>> {
         try {
-            const params = toUrlBody({ channelId });
+            const params = { channelId };
             const result = await apiPost<SuccessRemoveChannel, ErrorRemoveChannel>("removeChannel", params, token);
             return result;
         } catch (e) {
@@ -377,7 +362,7 @@ export class Api {
         description: string
     ): Promise<ApiResponse<SuccessUpdateChannel, ErrorUpdateChannel>> {
         try {
-            const params = toUrlBody({ channelId, displayName, description });
+            const params = { channelId, displayName, description };
             const result = await apiPost<SuccessUpdateChannel, ErrorUpdateChannel>("updateChannel", params, token);
             return result;
         } catch (e) {
@@ -414,7 +399,7 @@ export class Api {
         channelId: string
     ): Promise<ApiResponse<SuccessAddUserToChannel, ErrorAddUserToChannel>> {
         try {
-            const params = toUrlBody({ userId, channelId });
+            const params = { userId, channelId };
             const result = await apiPost<SuccessAddUserToChannel, ErrorAddUserToChannel>("addUserToChannel", params, token);
             return result;
         } catch (e) {
@@ -429,7 +414,7 @@ export class Api {
         channelId: string
     ): Promise<ApiResponse<SuccessRemoveUserFromChannel, ErrorRemoveUserFromChannel>> {
         try {
-            const params = toUrlBody({ userId, channelId });
+            const params = { userId, channelId };
             const result = await apiPost<SuccessRemoveUserFromChannel, ErrorRemoveUserFromChannel>("removeUserFromChannel", params, token);
             return result;
         } catch (e) {
@@ -452,7 +437,7 @@ export class Api {
 
     static async removeAttachment(token: string, attachmentId: string): Promise<ApiResponse<SuccessRemoveAttachment, ErrorRemoveAttachment>> {
         try {
-            const params = toUrlBody({ attachmentId });
+            const params = { attachmentId };
             const result = await apiPost<SuccessRemoveAttachment, ErrorRemoveAttachment>("removeAttachment", params, token);
             return result;
         } catch (e) {

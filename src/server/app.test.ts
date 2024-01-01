@@ -6,7 +6,11 @@ import { createApp } from "./app";
 import { assert, expect } from "chai";
 import { UserBasic } from "../common/common";
 
-describe("Integration Tests", () => {
+describe("Integration Tests", function () {
+    if (process.execArgv.some((arg) => arg.includes("--inspect"))) {
+        this.timeout(0); // Disable timeout if debugger is attached
+    }
+
     let container: StartedTestContainer;
     let app: ReturnType<typeof createApp>;
     const tmpUploadDir = "./tmp";
@@ -101,7 +105,7 @@ describe("Integration Tests", () => {
         expect(result3.data).to.include(user);
     });
 
-    it("Should create a channel and add admin", async () => {
+    it("Should create a channel", async () => {
         const result = await Api.createRoomAndAdmin("room", "admin", true);
         assert(result.success);
         const { admin, room } = result.data;
@@ -116,10 +120,93 @@ describe("Integration Tests", () => {
             isPrivate: false,
             createdBy: admin.id,
         });
+    });
+
+    it("Should create a private channel and add admin and a user and remove user", async () => {
+        const result = await Api.createRoomAndAdmin("room", "admin", true);
+        assert(result.success);
+        const { admin, room } = result.data;
+        const result2 = await Api.createChannel(admin.token, "channel", true);
+        assert(result2.success);
+        const result3 = await Api.getChannel(admin.token, result2.data.channelId);
+        assert(result3.success);
+        expect(result3.data).to.include({
+            id: result2.data.channelId,
+            roomId: room.id,
+            displayName: "channel",
+            isPrivate: true,
+            createdBy: admin.id,
+        });
         const result4 = await Api.getUsers(admin.token, result2.data.channelId);
         assert(result4.success);
         assert(result4.data.length == 1);
-        delete (admin as any)["token"];
-        expect(result4.data[0]).to.deep.equal(admin);
+
+        const result5 = await Api.createInviteCode(admin.token);
+        assert(result5.success);
+        const result6 = await Api.createUserFromInviteCode(result5.data.inviteCode, "user");
+        assert(result6.success);
+        const result7 = await Api.addUserToChannel(admin.token, result6.data.id, result2.data.channelId);
+        assert(result7.success);
+        const result8 = await Api.getUsers(admin.token, result2.data.channelId);
+        assert(result8.success);
+        assert(result8.data.length == 2);
+
+        const result9 = await Api.removeUserFromChannel(admin.token, result6.data.id, result2.data.channelId);
+        assert(result9.success);
+
+        const result10 = await Api.getUsers(admin.token, result2.data.channelId);
+        assert(result10.success);
+        assert(result10.data.length == 1);
+    });
+
+    it("Should create a message", async () => {
+        const result = await Api.createRoomAndAdmin("room", "admin", true);
+        assert(result.success);
+        const { admin, room, generalChannel } = result.data;
+        const result2 = await Api.createMessage(
+            admin.token,
+            {
+                text: "Hello world",
+                facets: [],
+            },
+            generalChannel.id
+        );
+        assert(result2.success, JSON.stringify(result2));
+        const result3 = await Api.getMessages(admin.token, generalChannel.id);
+        assert(result3.success, JSON.stringify(result3));
+        assert(result3.data.length == 1);
+        delete (admin as any).token;
+        expect(result3.data[0]).to.deep.include({
+            id: result2.data.messageId,
+            user: admin,
+            content: { text: "Hello world", facets: [] },
+            channelId: generalChannel.id,
+        });
+    });
+
+    it("Should page through messages", async () => {
+        const result = await Api.createRoomAndAdmin("room", "admin", true);
+        assert(result.success);
+        const { admin, room, generalChannel } = result.data;
+        for (let i = 0; i < 10; i++) {
+            const result2 = await Api.createMessage(
+                admin.token,
+                {
+                    text: `message ${i + 1}`,
+                    facets: [],
+                },
+                generalChannel.id
+            );
+            assert(result2.success, JSON.stringify(result2));
+        }
+        let cursor: string | undefined;
+        for (let i = 0, j = 10; i < 10; i += 2, j -= 2) {
+            const result3 = await Api.getMessages(admin.token, generalChannel.id, undefined, cursor, 2);
+            assert(result3.success, JSON.stringify(result3));
+            assert(result3.data.length == 2);
+            expect(result3.data[0].content.text).to.equal(`message ${j}`);
+            expect(result3.data[1].content.text).to.equal(`message ${j - 1}`);
+            cursor = `${result3.data[result3.data.length - 1].id}`;
+        }
     });
 });

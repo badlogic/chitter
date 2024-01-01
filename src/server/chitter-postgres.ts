@@ -945,6 +945,7 @@ export class PostgresChitterDatabase implements Chitter {
             let messagesQuery: string;
             let queryParameters: any[];
 
+            const select = `SELECT m.id, m.content, m.created_at, m.channel_id, m.direct_message_user_id, u.id as user_id, u.room_id, u.display_name, u.description, u.avatar_id, u.role, u.created_at as user_created_at`;
             if (channelId) {
                 // Check if the channel is private and if the user is a member
                 const channelQuery = `SELECT is_private FROM channels WHERE id = $1 AND room_id = $2;`;
@@ -962,27 +963,39 @@ export class PostgresChitterDatabase implements Chitter {
                 }
 
                 // Fetch messages from the channel
+                queryParameters = [channelId, limit];
                 messagesQuery = `
-                SELECT m.id, m.content, m.created_at, u.id as user_id, u.display_name, u.description, u.avatar_id, u.role
+                ${select}
                 FROM messages m
                 JOIN users u ON m.user_id = u.id
                 WHERE m.channel_id = $1
-                ORDER BY m.id DESC
-                LIMIT $2;
                 `;
-                queryParameters = [channelId, limit];
+                if (cursor) {
+                    messagesQuery += ` AND m.id < $3`;
+                    queryParameters.push(cursor);
+                }
+                messagesQuery += `
+                    ORDER BY m.id DESC
+                    LIMIT $2;
+                `;
             } else {
                 // Fetch direct messages between two users
+                queryParameters = [directMessageUserId, userId, limit];
                 messagesQuery = `
-                SELECT m.id, m.content, m.created_at, u.id as user_id, u.room_id, u.display_name, u.description, u.avatar_id, u.role
+                ${select}
                 FROM messages m
                 JOIN users u ON m.user_id = u.id
                 WHERE (m.direct_message_user_id = $1 AND m.user_id = $2)
                    OR (m.direct_message_user_id = $2 AND m.user_id = $1)
-                ORDER BY m.id DESC
-                LIMIT $3;
+                   `;
+                if (cursor) {
+                    messagesQuery += ` AND m.id < $4`;
+                    queryParameters.push(cursor);
+                }
+                messagesQuery += `
+                    ORDER BY m.id DESC
+                    LIMIT $3;
                 `;
-                queryParameters = [directMessageUserId, userId, limit];
             }
 
             const messagesResult = await client.query(messagesQuery, queryParameters);
@@ -996,14 +1009,16 @@ export class PostgresChitterDatabase implements Chitter {
                     description: messageRow.description,
                     avatar: messageRow.avatar_id,
                     role: messageRow.role,
-                    createdAt: new Date(messageRow.created_at).getTime(),
+                    createdAt: new Date(messageRow.user_created_at).getTime(),
                 });
-                return {
+                return removeNullProperties({
                     id: messageRow.id,
                     user,
                     createdAt: new Date(messageRow.created_at).getTime(),
-                    content: JSON.parse(messageRow.content) as MessageContent,
-                };
+                    content: messageRow.content as MessageContent,
+                    channelId: messageRow.channel_id,
+                    directMessageUserId: messageRow.direct_message_user_id,
+                });
             });
 
             return messages;
@@ -1185,9 +1200,9 @@ export class PostgresChitterDatabase implements Chitter {
             SELECT c.id, c.room_id, c.created_at, c.display_name, c.description, c.is_private, c.created_by
             FROM channels c
             LEFT JOIN private_channel_members pcm ON c.id = pcm.channel_id
-            WHERE c.id = $1 AND c.room_id = $2 AND (c.is_private = false OR pcm.user_id = $2);
+            WHERE c.id = $1 AND c.room_id = $2 AND (c.is_private = false OR pcm.user_id = $3);
             `;
-            const targetChannelResult = await client.query(targetChannelQuery, [channelId, roomId]);
+            const targetChannelResult = await client.query(targetChannelQuery, [channelId, roomId, userId]);
             if (targetChannelResult.rows.length === 0) {
                 return new ChitterError("Channel not found");
             }
