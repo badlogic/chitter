@@ -1,11 +1,12 @@
 {
     "compilerOptions": {
-        "target": "ES6",
-        "module": "CommonJS",
+        "target": "ESNext",
+        "module": "ESNext",
         "strict": true,
-        "lib": ["es2021", "dom", "WebWorker"],
+        "lib": ["esnext", "dom", "WebWorker"],
         "esModuleInterop": true,
         "experimentalDecorators": true,
-        "skipLibCheck": true
+        "skipLibCheck": true,
+        "moduleResolution": "node"
     }
 }

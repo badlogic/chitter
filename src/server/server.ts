@@ -18,4 +18,4 @@ if (!dbPassword) {
     process.exit(-1);
 }
 
-createApp({ name: dbName, user: dbUser, password: dbPassword, host: "db" }, uploadDirectory, port);
+createApp({ name: dbName, user: dbUser, password: dbPassword, host: "db", port: 5432 }, uploadDirectory, port);

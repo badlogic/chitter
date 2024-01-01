@@ -50,7 +50,7 @@ import {
     SuccessUpdateUser,
     SuccessUploadAttachment,
 } from "./common/common";
-import { error } from "./utils/utils";
+import { error } from "./utils/utils.js";
 
 function apiBaseUrl() {
     if (typeof location === "undefined") return "http://localhost:3333/api/";
