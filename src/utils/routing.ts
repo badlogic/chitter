@@ -1,7 +1,7 @@
 import { TemplateResult } from "lit";
 import { Key, pathToRegexp } from "path-to-regexp";
-import { StreamView } from "./streamviews";
-import { dom, getScrollParent } from "./ui-components";
+import { StreamView } from "./streamviews.js";
+import { dom, getScrollParent } from "./ui-components.js";
 
 export class Route<T extends HTMLElement> {
     readonly regexp: RegExp;

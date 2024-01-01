@@ -7,8 +7,8 @@ import * as fs from "fs";
 import * as http from "http";
 import WebSocket, { WebSocketServer } from "ws";
 import { Pool } from "pg";
-import { sleep } from "../utils/utils";
-import { PostgresChitterDatabase } from "./database-postgres";
+import { sleep } from "../utils/utils.js";
+import { PostgresChitterDatabase } from "./database-postgres.js";
 import {
     ChitterError,
     ErrorAddUserToChannel,
@@ -58,7 +58,7 @@ import {
     SuccessUpdateRoom,
     SuccessUpdateUser,
     SuccessUploadAttachment,
-} from "../common/common";
+} from "../common/common.js";
 import { body, header, query, validationResult } from "express-validator";
 import { diskStorage } from "multer";
 import multer from "multer";

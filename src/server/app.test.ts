@@ -1,10 +1,10 @@
 import { GenericContainer, StartedTestContainer } from "testcontainers";
-import { createApp } from "./app";
+import { createApp } from "./app.js";
 import * as fs from "fs";
 import * as util from "util";
 import * as path from "path";
 import { Environment } from "testcontainers/build/types";
-import { Api } from "../api";
+import { Api } from "../api.js";
 
 describe("Integration Tests", () => {
     let container: StartedTestContainer;

@@ -49,7 +49,7 @@ import {
     SuccessUploadAttachment,
     ErrorRemoveAttachment,
     SuccessRemoveAttachment,
-} from "../common/common";
+} from "../common/common.js";
 
 export interface ChitterDatabase {
     initialize(): Promise<ChitterError<Extract<ErrorReason, "Could not create tables">> | void>;

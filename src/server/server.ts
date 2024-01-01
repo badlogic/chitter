@@ -1,4 +1,4 @@
-import { createApp } from "./app";
+import { createApp } from "./app.js";
 
 const uploadDirectory = "docker/data/uploads";
 const port = process.env.PORT ?? 3333;

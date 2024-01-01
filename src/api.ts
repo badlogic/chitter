@@ -49,7 +49,7 @@ import {
     SuccessUpdateRoom,
     SuccessUpdateUser,
     SuccessUploadAttachment,
-} from "./common/common";
+} from "./common/common.js";
 import { error } from "./utils/utils.js";
 
 function apiBaseUrl() {

@@ -118,7 +118,7 @@ import eyeOpenIconSvg from "remixicon/icons/System/eye-line.svg";
 import eyeClosedIconSvg from "remixicon/icons/System/eye-off-line.svg";
 
 // @ts-ignore
-import favIconSvg from "../../html/favicon.svg";
+import favIconSvg from "../../html/favicon.svg.js";
 
 import { unsafeHTML } from "lit-html/directives/unsafe-html.js";
 

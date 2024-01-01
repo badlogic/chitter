@@ -1,11 +1,11 @@
 import { LitElement, PropertyValueMap, html } from "lit";
 import { customElement } from "lit/decorators.js";
-import { i18n } from "./utils/i18n";
-import { setupLiveReload } from "./utils/live-reload";
-import { renderError } from "./utils/ui-components";
-import { router } from "./utils/routing";
-export * from "./pages/index";
-export * from "./utils/ui-components";
+import { i18n } from "./utils/i18n.js";
+import { setupLiveReload } from "./utils/live-reload.js";
+import { renderError } from "./utils/ui-components.js";
+import { router } from "./utils/routing.js";
+export * from "./pages/index.js";
+export * from "./utils/ui-components.js";
 
 setupLiveReload();
 
