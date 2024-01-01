@@ -7,8 +7,8 @@ import * as fs from "fs";
 import * as http from "http";
 import WebSocket, { WebSocketServer } from "ws";
 import { Pool } from "pg";
-import { sleep } from "../utils/utils.js";
-import { PostgresChitterDatabase } from "./database-postgres.js";
+import { sleep } from "../utils/utils";
+import { PostgresChitterDatabase } from "./database-postgres";
 import {
     ChitterError,
     ErrorAddUserToChannel,
@@ -58,12 +58,13 @@ import {
     SuccessUpdateRoom,
     SuccessUpdateUser,
     SuccessUploadAttachment,
-} from "../common/common.js";
+} from "../common/common";
 import { body, header, query, validationResult } from "express-validator";
+import { diskStorage } from "multer";
 import multer from "multer";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
-import { fileTypeFromFile } from "file-type";
+import { fromFile as fileTypeFromFile } from "file-type";
 
 function apiSuccess<T>(res: Response, data?: T) {
     return res.json({ sucess: true, data });
@@ -117,7 +118,7 @@ function setupLiveReload(server: http.Server) {
 }
 
 export async function createApp(
-    dbConfig: { name: string; user: string; password: string; host: string },
+    dbConfig: { name: string; user: string; password: string; host: string; port: number },
     uploadDirectory: string,
     port: string | number = 3333
 ) {
@@ -127,11 +128,12 @@ export async function createApp(
         database: dbConfig.name,
         user: dbConfig.user,
         password: dbConfig.password,
-        port: 5432,
+        port: dbConfig.port,
     });
     const result = await waitForDatabase(pool, 5, 3000);
     if (result instanceof Error) throw result;
     const db = new PostgresChitterDatabase(pool);
+    await db.initialize();
 
     // Initialize file upload
     if (!fs.existsSync(uploadDirectory)) {
@@ -677,4 +679,11 @@ export async function createApp(
 
     // Setup live reload
     setupLiveReload(server);
+
+    return async () => {
+        await server.closeAllConnections();
+        await server.close();
+        db.close();
+        await pool.end();
+    };
 }

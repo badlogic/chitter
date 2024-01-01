@@ -1,7 +1,7 @@
 import { LitElement, html, render } from "lit";
-import { closeButton, renderTopbar } from "../app.js";
+import { closeButton, renderTopbar } from "../app";
 import { customElement } from "lit/decorators.js";
-import { pageContainerStyle, pageContentStyle } from "../utils/styles.js";
+import { pageContainerStyle, pageContentStyle } from "../utils/styles";
 
 @customElement("settings-page")
 export class SettingsPage extends LitElement {

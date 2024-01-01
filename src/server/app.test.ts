@@ -1,14 +1,16 @@
 import { GenericContainer, StartedTestContainer } from "testcontainers";
-import { createApp } from "./app.js"; // Adjust the path
-import { Environment } from "testcontainers/build/types.js";
+import { createApp } from "./app";
 import * as fs from "fs";
 import * as util from "util";
 import * as path from "path";
+import { Environment } from "testcontainers/build/types";
+import { Api } from "../api";
 
 describe("Integration Tests", () => {
     let container: StartedTestContainer;
     let app: ReturnType<typeof createApp>;
     const tmpUploadDir = path.join(__dirname, "./tmp");
+    let stopApp: () => Promise<void>;
 
     before(async () => {
         const environment: Environment = {
@@ -27,14 +29,20 @@ describe("Integration Tests", () => {
             port: container.getMappedPort(5432),
         };
 
-        await createApp(dbConfig, tmpUploadDir);
+        stopApp = await createApp(dbConfig, tmpUploadDir);
     });
 
     after(async () => {
+        await stopApp();
         await container.stop();
         if (fs.existsSync(tmpUploadDir)) {
+            fs.rmSync(tmpUploadDir, { recursive: true });
         }
+        // FIXME test hangs otherwise
+        process.exit(0);
     });
 
-    // Add your test cases here
+    it("Should create a room and admin account", async () => {
+        const result = await Api.createRoomAndAdmin("room", "admin", true);
+    });
 });

@@ -59,19 +59,26 @@ import {
     SuccessCreateTransferBundle,
     SuccessGetTransferBundleFromCode,
     UserBasic,
-} from "../common/common.js";
-import { ChitterDatabase } from "./database.js";
+} from "../common/common";
+import { ChitterDatabase } from "./database";
 
 export class PostgresChitterDatabase implements ChitterDatabase {
     private pool: Pool;
     private inviteCodes: Map<string, { roomId: string; expiresAt: Date }>;
     private transferCodes: Map<string, { userIds: string[]; expiresAt: Date }>;
+    private closed = false;
+    private cleanupCodesTimeout: any;
 
     constructor(pool: Pool) {
         this.pool = pool;
         this.inviteCodes = new Map();
         this.transferCodes = new Map();
-        setInterval(() => this.cleanupCodes(), 3600000); // Cleanup every hour
+        this.cleanupCodes();
+    }
+
+    close() {
+        this.closed = true;
+        clearTimeout(this.cleanupCodesTimeout);
     }
 
     async initialize(): Promise<ChitterError<Extract<ErrorReason, "Could not create tables">> | void> {
@@ -220,6 +227,7 @@ export class PostgresChitterDatabase implements ChitterDatabase {
     }
 
     private cleanupCodes() {
+        if (this.closed) return;
         const now = new Date();
 
         // Cleanup transfer codes (expire after 1 hour)
@@ -235,6 +243,7 @@ export class PostgresChitterDatabase implements ChitterDatabase {
                 this.inviteCodes.delete(key);
             }
         });
+        this.cleanupCodesTimeout = setTimeout(() => this.cleanupCodes(), 3600000);
     }
 
     async createInviteCode(userToken: string): Promise<ChitterError<ErrorCreateInviteCode> | SuccessCreateInviteCode> {

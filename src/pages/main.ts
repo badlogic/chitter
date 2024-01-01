@@ -1,12 +1,10 @@
-import { LitElement, PropertyValueMap, html, nothing } from "lit";
+import { html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
-import { Api } from "../api.js";
-import { BaseElement, renderError } from "../app.js";
-import { i18n } from "../utils/i18n.js";
-import { router } from "../utils/routing.js";
-import { pageContainerStyle, pageContentStyle } from "../utils/styles.js";
-import { sleep } from "../utils/utils.js";
-import { speechBubbleIcon } from "../utils/icons.js";
+import { Api } from "../api";
+import { BaseElement, renderError } from "../app";
+import { i18n } from "../utils/i18n";
+import { speechBubbleIcon } from "../utils/icons";
+import { pageContainerStyle, pageContentStyle } from "../utils/styles";
 
 @customElement("main-page")
 export class MainPage extends BaseElement {
