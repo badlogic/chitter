@@ -6,9 +6,9 @@ import express, { Request, Response } from "express";
 import * as fs from "fs";
 import * as http from "http";
 import WebSocket, { WebSocketServer } from "ws";
-import { Pool } from "pg";
-import { sleep } from "../utils/utils.js";
-import { PostgresChitterDatabase } from "./database-postgres.js";
+import type { Pool } from "pg";
+import { sleep } from "../utils/utils";
+import { PostgresChitterDatabase } from "./database-postgres";
 import {
     ChitterError,
     ErrorAddUserToChannel,
@@ -58,13 +58,12 @@ import {
     SuccessUpdateRoom,
     SuccessUpdateUser,
     SuccessUploadAttachment,
-} from "../common/common.js";
+} from "../common/common";
 import { body, header, query, validationResult } from "express-validator";
-import { diskStorage } from "multer";
 import multer from "multer";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
-import { fromFile as fileTypeFromFile } from "file-type";
+import { fileTypeFromFile } from "file-type";
 
 function apiSuccess<T>(res: Response, data?: T) {
     return res.json({ sucess: true, data });

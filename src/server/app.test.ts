@@ -1,15 +1,15 @@
 import { GenericContainer, StartedTestContainer } from "testcontainers";
-import { createApp } from "./app.js";
+import { createApp } from "./app";
 import * as fs from "fs";
 import * as util from "util";
 import * as path from "path";
 import { Environment } from "testcontainers/build/types";
-import { Api } from "../api.js";
+import { Api } from "../api";
 
 describe("Integration Tests", () => {
     let container: StartedTestContainer;
     let app: ReturnType<typeof createApp>;
-    const tmpUploadDir = path.join(__dirname, "./tmp");
+    const tmpUploadDir = "./tmp";
     let stopApp: () => Promise<void>;
 
     before(async () => {

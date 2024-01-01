@@ -1,9 +1,9 @@
 import { LitElement, PropertyValueMap, TemplateResult, html } from "lit";
 import { property, query, state } from "lit/decorators.js";
-import { i18n } from "./i18n.js";
-import { Stream, StreamPage } from "./streams.js";
-import { UpButton, dom, getScrollParent, isSafariBrowser, onVisibleOnce, renderError, waitForLitElementsToRender } from "./ui-components.js";
-import { error } from "./utils.js";
+import { i18n } from "./i18n";
+import { Stream, StreamPage } from "./streams";
+import { UpButton, dom, getScrollParent, isSafariBrowser, onVisibleOnce, renderError, waitForLitElementsToRender } from "./ui-components";
+import { error } from "./utils";
 
 type RenderedPage<T> = { container: HTMLElement; items: HTMLElement[]; width: number; height: number; placeholder?: HTMLElement };
 

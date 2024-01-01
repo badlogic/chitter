@@ -59,8 +59,8 @@ import {
     SuccessCreateTransferBundle,
     SuccessGetTransferBundleFromCode,
     UserBasic,
-} from "../common/common.js";
-import { ChitterDatabase } from "./database.js";
+} from "../common/common";
+import { ChitterDatabase } from "./database";
 
 export class PostgresChitterDatabase implements ChitterDatabase {
     private pool: Pool;

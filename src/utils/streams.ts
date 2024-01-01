@@ -1,4 +1,4 @@
-import { error } from "./utils.js";
+import { error } from "./utils";
 
 export type StreamPage<T> = { cursor?: string; items: T[] };
 
