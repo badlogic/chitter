@@ -9,13 +9,61 @@ import WebSocket, { WebSocketServer } from "ws";
 import { Pool } from "pg";
 import { sleep } from "../utils/utils.js";
 import { ChitterDatabase } from "./database.js";
-import { ChitterError } from "../common/common.js";
+import {
+    ChitterError,
+    ErrorAddUserToChannel,
+    ErrorCreateChannel,
+    ErrorCreateInviteCode,
+    ErrorCreateMessage,
+    ErrorCreateRoomAndAdmin,
+    ErrorCreateTransferBundle,
+    ErrorCreateUserFromInviteCode,
+    ErrorEditMessage,
+    ErrorGetChannels,
+    ErrorGetMessages,
+    ErrorGetTransferBundleFromCode,
+    ErrorGetUser,
+    ErrorGetUsers,
+    ErrorReason,
+    ErrorRemoveAttachment,
+    ErrorRemoveChannel,
+    ErrorRemoveMessage,
+    ErrorRemoveUser,
+    ErrorRemoveUserFromChannel,
+    ErrorSetUserRole,
+    ErrorUpdateChannel,
+    ErrorUpdateRoom,
+    ErrorUpdateUser,
+    ErrorUploadAttachment,
+    SuccessAddUserToChannel,
+    SuccessCreateChannel,
+    SuccessCreateInviteCode,
+    SuccessCreateMessage,
+    SuccessCreateRoomAndAdmin,
+    SuccessCreateTransferBundle,
+    SuccessCreateUserFromInviteCode,
+    SuccessEditMessage,
+    SuccessGetChannels,
+    SuccessGetMessages,
+    SuccessGetTransferBundleFromCode,
+    SuccessGetUser,
+    SuccessGetUsers,
+    SuccessRemoveAttachment,
+    SuccessRemoveChannel,
+    SuccessRemoveMessage,
+    SuccessRemoveUser,
+    SuccessRemoveUserFromChannel,
+    SuccessSetUserRole,
+    SuccessUpdateChannel,
+    SuccessUpdateRoom,
+    SuccessUpdateUser,
+    SuccessUploadAttachment,
+} from "../common/common.js";
 import { body, header, query, validationResult } from "express-validator";
 import multer from "multer";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
-import fileType, { fileTypeFromFile } from "file-type";
-import sharp from "sharp";
+import { fileTypeFromFile } from "file-type";
 
 const uploadDirectory = "docker/data/uploads";
 
@@ -66,8 +114,16 @@ const pool = new Pool({
 
 const db = new ChitterDatabase(pool);
 
+function apiSuccess<T>(res: Response, data?: T) {
+    return res.json({ sucess: true, data });
+}
+
+function apiError<E extends ErrorReason = ErrorReason>(res: Response, error: E, validationErrors?: any) {
+    return res.status(400).json({ success: false, error, validationErrors });
+}
+
 (async () => {
-    const result = await connectWithRetry(5, 3000);
+    const result = await waitForDatabase(5, 3000);
     if (result instanceof Error) {
         process.exit(-1);
     }
@@ -88,44 +144,32 @@ const db = new ChitterDatabase(pool);
         async (req: Request, res: Response) => {
             // Check for validation errors
             const errors = validationResult(req);
-            if (!errors.isEmpty()) {
-                return res.status(400).json({ success: false, errors: errors.array() });
-            }
+            if (!errors.isEmpty()) return apiError(res, "Invalid parameters", errors.array());
 
             try {
                 const { roomName, adminName, adminInviteOnly } = req.body;
                 const result = await db.createRoomAndAdmin(roomName, adminName, adminInviteOnly);
-
-                if (result instanceof ChitterError) {
-                    return res.status(400).json({ success: false, error: result.reason });
-                }
-
-                res.json({ success: true, data: result });
+                if (result instanceof ChitterError) return apiError<ErrorCreateRoomAndAdmin>(res, result.reason);
+                apiSuccess<SuccessCreateRoomAndAdmin>(res, result);
             } catch (err) {
                 console.error(err);
-                res.status(500).json({ success: false, error: "Server error occurred." });
+                apiError(res, "Unknown server error");
             }
         }
     );
 
     app.post("/api/createInviteCode", [header("authorization").notEmpty()], async (req: Request, res: Response) => {
         const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({ success: false, errors: errors.array() });
-        }
+        if (!errors.isEmpty()) return apiError(res, "Invalid parameters", errors.array());
 
         try {
             const token = req.headers.authorization!;
             const inviteCode = await db.createInviteCode(token);
-
-            if (inviteCode instanceof ChitterError) {
-                return res.status(400).json({ success: false, error: inviteCode.reason });
-            }
-
-            res.json({ success: true, data: inviteCode });
+            if (inviteCode instanceof ChitterError) return apiError<ErrorCreateInviteCode>(res, inviteCode.reason);
+            apiSuccess<SuccessCreateInviteCode>(res, inviteCode);
         } catch (err) {
             console.error(err);
-            res.status(500).json({ success: false, error: "Server error occurred." });
+            apiError(res, "Unknown server error");
         }
     });
 
@@ -134,22 +178,16 @@ const db = new ChitterDatabase(pool);
         [body("inviteCode").isString().trim().notEmpty(), body("displayName").isString().trim().notEmpty()],
         async (req: Request, res: Response) => {
             const errors = validationResult(req);
-            if (!errors.isEmpty()) {
-                return res.status(400).json({ success: false, errors: errors.array() });
-            }
+            if (!errors.isEmpty()) return apiError(res, "Invalid parameters", errors.array());
 
             try {
                 const { inviteCode, displayName } = req.body;
                 const user = await db.createUserFromInviteCode(inviteCode, displayName);
-
-                if (user instanceof ChitterError) {
-                    return res.status(400).json({ success: false, error: user.reason });
-                }
-
-                res.json({ success: true, data: user });
+                if (user instanceof ChitterError) return apiError<ErrorCreateUserFromInviteCode>(res, user.reason);
+                apiSuccess<SuccessCreateUserFromInviteCode>(res, user);
             } catch (err) {
                 console.error(err);
-                res.status(500).json({ success: false, error: "Server error occurred." });
+                apiError(res, "Unknown server error");
             }
         }
     );
@@ -159,66 +197,48 @@ const db = new ChitterDatabase(pool);
         [header("authorization").notEmpty(), body("userId").isString().trim().notEmpty()],
         async (req: Request, res: Response) => {
             const errors = validationResult(req);
-            if (!errors.isEmpty()) {
-                return res.status(400).json({ success: false, errors: errors.array() });
-            }
+            if (!errors.isEmpty()) return apiError(res, "Invalid parameters", errors.array());
 
             try {
                 const adminToken = req.headers.authorization!;
                 const { userId } = req.body;
                 const result = await db.removeUser(userId, adminToken);
-
-                if (result instanceof ChitterError) {
-                    return res.status(400).json({ success: false, error: result.reason });
-                }
-
-                res.json({ success: true, message: "User removed successfully" });
+                if (result instanceof ChitterError) return apiError<ErrorRemoveUser>(res, result.reason);
+                apiSuccess<SuccessRemoveUser>(res);
             } catch (err) {
                 console.error(err);
-                res.status(500).json({ success: false, error: "Server error occurred." });
+                apiError(res, "Unknown server error");
             }
         }
     );
 
-    app.post("/api/createTransferCode", [body("userTokens").isArray().isLength({ min: 1 })], async (req: Request, res: Response) => {
+    app.post("/api/createTransferBundle", [body("userTokens").isArray().isLength({ min: 1 })], async (req: Request, res: Response) => {
         const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({ success: false, errors: errors.array() });
-        }
+        if (!errors.isEmpty()) return apiError(res, "Invalid parameters", errors.array());
 
         try {
             const { userTokens } = req.body;
-            const transferCode = await db.createTransferCode(userTokens);
-
-            if (transferCode instanceof ChitterError) {
-                return res.status(400).json({ success: false, error: transferCode.reason });
-            }
-
-            res.json({ success: true, data: transferCode });
+            const transferCode = await db.createTransferBundle(userTokens);
+            if (transferCode instanceof ChitterError) return apiError<ErrorCreateTransferBundle>(res, transferCode.reason);
+            apiSuccess<SuccessCreateTransferBundle>(res, transferCode);
         } catch (err) {
             console.error(err);
-            res.status(500).json({ success: false, error: "Server error occurred." });
+            apiError(res, "Unknown server error");
         }
     });
 
-    app.post("/api/createTransferBundleFromCode", [body("transferCode").isString().trim().notEmpty()], async (req: Request, res: Response) => {
+    app.post("/api/getTransferBundleFromCode", [body("transferCode").isString().trim().notEmpty()], async (req: Request, res: Response) => {
         const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({ success: false, errors: errors.array() });
-        }
+        if (!errors.isEmpty()) return apiError(res, "Invalid parameters", errors.array());
 
         try {
             const { transferCode } = req.body;
-            const transferBundle = await db.createTransferBundleFromCode(transferCode);
-
-            if (transferBundle instanceof ChitterError) {
-                return res.status(400).json({ success: false, error: transferBundle.reason });
-            }
-
-            res.json({ success: true, data: transferBundle });
+            const transferBundle = await db.getTransferBundleFromCode(transferCode);
+            if (transferBundle instanceof ChitterError) return apiError<ErrorGetTransferBundleFromCode>(res, transferBundle.reason);
+            apiSuccess<SuccessGetTransferBundleFromCode>(res, transferBundle);
         } catch (err) {
             console.error(err);
-            res.status(500).json({ success: false, error: "Server error occurred." });
+            apiError(res, "Unknown server error");
         }
     });
 
@@ -232,23 +252,17 @@ const db = new ChitterDatabase(pool);
         ],
         async (req: Request, res: Response) => {
             const errors = validationResult(req);
-            if (!errors.isEmpty()) {
-                return res.status(400).json({ success: false, errors: errors.array() });
-            }
+            if (!errors.isEmpty()) return apiError(res, "Invalid parameters", errors.array());
 
             try {
                 const token = req.headers.authorization!;
                 const { content, channelId, directMessageUserId } = req.body;
                 const result = await db.createMessage(token, content, channelId, directMessageUserId);
-
-                if (result instanceof ChitterError) {
-                    return res.status(400).json({ success: false, error: result.reason });
-                }
-
-                res.json({ success: true, data: result });
+                if (result instanceof ChitterError) return apiError<ErrorCreateMessage>(res, result.reason);
+                apiSuccess<SuccessCreateMessage>(res, result);
             } catch (err) {
                 console.error(err);
-                res.status(500).json({ success: false, error: "Server error occurred." });
+                apiError(res, "Unknown server error");
             }
         }
     );
@@ -258,23 +272,17 @@ const db = new ChitterDatabase(pool);
         [header("authorization").notEmpty(), body("messageId").isString().trim().notEmpty()],
         async (req: Request, res: Response) => {
             const errors = validationResult(req);
-            if (!errors.isEmpty()) {
-                return res.status(400).json({ success: false, errors: errors.array() });
-            }
+            if (!errors.isEmpty()) return apiError(res, "Invalid parameters", errors.array());
 
             try {
                 const token = req.headers.authorization!;
                 const { messageId } = req.body;
                 const result = await db.removeMessage(token, messageId);
-
-                if (result instanceof ChitterError) {
-                    return res.status(400).json({ success: false, error: result.reason });
-                }
-
-                res.json({ success: true, message: "Message removed successfully" });
+                if (result instanceof ChitterError) return apiError<ErrorRemoveMessage>(res, result.reason);
+                apiSuccess<SuccessRemoveMessage>(res);
             } catch (err) {
                 console.error(err);
-                res.status(500).json({ success: false, error: "Server error occurred." });
+                apiError(res, "Unknown server error");
             }
         }
     );
@@ -284,23 +292,18 @@ const db = new ChitterDatabase(pool);
         [header("authorization").notEmpty(), body("messageId").isString().trim().notEmpty(), body("content").notEmpty()],
         async (req: Request, res: Response) => {
             const errors = validationResult(req);
-            if (!errors.isEmpty()) {
-                return res.status(400).json({ success: false, errors: errors.array() });
-            }
+            if (!errors.isEmpty()) return apiError(res, "Invalid parameters", errors.array());
 
             try {
                 const token = req.headers.authorization!;
                 const { messageId, content } = req.body;
                 const result = await db.editMessage(token, messageId, content);
 
-                if (result instanceof ChitterError) {
-                    return res.status(400).json({ success: false, error: result.reason });
-                }
-
-                res.json({ success: true, message: "Message edited successfully" });
+                if (result instanceof ChitterError) return apiError<ErrorEditMessage>(res, result.reason);
+                apiSuccess<SuccessEditMessage>(res);
             } catch (err) {
                 console.error(err);
-                res.status(500).json({ success: false, error: "Server error occurred." });
+                apiError(res, "Unknown server error");
             }
         }
     );
@@ -316,23 +319,18 @@ const db = new ChitterDatabase(pool);
         ],
         async (req: Request, res: Response) => {
             const errors = validationResult(req);
-            if (!errors.isEmpty()) {
-                return res.status(400).json({ success: false, errors: errors.array() });
-            }
+            if (!errors.isEmpty()) return apiError(res, "Invalid parameters", errors.array());
 
             try {
                 const adminToken = req.headers.authorization!;
                 const { displayName, adminInviteOnly, description, logoId } = req.body;
                 const result = await db.updateRoom(adminToken, displayName, adminInviteOnly, description, logoId);
 
-                if (result instanceof ChitterError) {
-                    return res.status(400).json({ success: false, error: result.reason });
-                }
-
-                res.json({ success: true, message: "Room updated successfully" });
+                if (result instanceof ChitterError) return apiError<ErrorUpdateRoom>(res, result.reason);
+                apiSuccess<SuccessUpdateRoom>(res);
             } catch (err) {
                 console.error(err);
-                res.status(500).json({ success: false, error: "Server error occurred." });
+                apiError(res, "Unknown server error");
             }
         }
     );
@@ -347,23 +345,18 @@ const db = new ChitterDatabase(pool);
         ],
         async (req: Request, res: Response) => {
             const errors = validationResult(req);
-            if (!errors.isEmpty()) {
-                return res.status(400).json({ success: false, errors: errors.array() });
-            }
+            if (!errors.isEmpty()) return apiError(res, "Invalid parameters", errors.array());
 
             try {
                 const userToken = req.headers.authorization!;
                 const { displayName, description, avatar } = req.body;
                 const result = await db.updateUser(userToken, displayName, description, avatar);
 
-                if (result instanceof ChitterError) {
-                    return res.status(400).json({ success: false, error: result.reason });
-                }
-
-                res.json({ success: true, message: "User updated successfully" });
+                if (result instanceof ChitterError) return apiError<ErrorUpdateUser>(res, result.reason);
+                apiSuccess<SuccessUpdateUser>(res);
             } catch (err) {
                 console.error(err);
-                res.status(500).json({ success: false, error: "Server error occurred." });
+                apiError(res, "Unknown server error");
             }
         }
     );
@@ -373,23 +366,18 @@ const db = new ChitterDatabase(pool);
         [header("authorization").notEmpty(), body("userId").isString().trim().notEmpty(), body("role").isIn(["admin", "participant"])],
         async (req: Request, res: Response) => {
             const errors = validationResult(req);
-            if (!errors.isEmpty()) {
-                return res.status(400).json({ success: false, errors: errors.array() });
-            }
+            if (!errors.isEmpty()) return apiError(res, "Invalid parameters", errors.array());
 
             try {
                 const adminToken = req.headers.authorization!;
                 const { userId, role } = req.body;
                 const result = await db.setUserRole(adminToken, userId, role);
 
-                if (result instanceof ChitterError) {
-                    return res.status(400).json({ success: false, error: result.reason });
-                }
-
-                res.json({ success: true, message: "User role set successfully" });
+                if (result instanceof ChitterError) return apiError<ErrorSetUserRole>(res, result.reason);
+                apiSuccess<SuccessSetUserRole>(res);
             } catch (err) {
                 console.error(err);
-                res.status(500).json({ success: false, error: "Server error occurred." });
+                apiError(res, "Unknown server error");
             }
         }
     );
@@ -405,9 +393,7 @@ const db = new ChitterDatabase(pool);
         ],
         async (req: Request, res: Response) => {
             const errors = validationResult(req);
-            if (!errors.isEmpty()) {
-                return res.status(400).json({ success: false, errors: errors.array() });
-            }
+            if (!errors.isEmpty()) return apiError(res, "Invalid parameters", errors.array());
 
             try {
                 const token = req.headers.authorization!;
@@ -420,11 +406,8 @@ const db = new ChitterDatabase(pool);
                     parseInt(limit as string)
                 );
 
-                if (result instanceof ChitterError) {
-                    return res.status(400).json({ success: false, error: result.reason });
-                }
-
-                res.json({ success: true, data: result });
+                if (result instanceof ChitterError) return apiError<ErrorGetMessages>(res, result.reason);
+                apiSuccess<SuccessGetMessages>(res, result);
             } catch (err) {
                 console.error(err);
                 res.status(500).json({ success: false, error: "Server error occurred." });
@@ -435,7 +418,7 @@ const db = new ChitterDatabase(pool);
     app.get("/api/getUsers", [header("authorization").notEmpty(), query("channelId").optional().isString()], async (req: Request, res: Response) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
-            return res.status(400).json({ success: false, errors: errors.array() });
+            return apiError(res, "Invalid parameters", errors.array());
         }
 
         try {
@@ -443,14 +426,11 @@ const db = new ChitterDatabase(pool);
             const { channelId } = req.query;
             const result = await db.getUsers(token, channelId as string);
 
-            if (result instanceof ChitterError) {
-                return res.status(400).json({ success: false, error: result.reason });
-            }
-
-            res.json({ success: true, data: result });
+            if (result instanceof ChitterError) return apiError<ErrorGetUsers>(res, result.reason);
+            apiSuccess<SuccessGetUsers>(res, result);
         } catch (err) {
             console.error(err);
-            res.status(500).json({ success: false, error: "Server error occurred." });
+            apiError(res, "Unknown server error");
         }
     });
 
@@ -459,23 +439,18 @@ const db = new ChitterDatabase(pool);
         [header("authorization").notEmpty(), query("userId").isString().trim().notEmpty()],
         async (req: Request, res: Response) => {
             const errors = validationResult(req);
-            if (!errors.isEmpty()) {
-                return res.status(400).json({ success: false, errors: errors.array() });
-            }
+            if (!errors.isEmpty()) return apiError(res, "Invalid parameters", errors.array());
 
             try {
                 const token = req.headers.authorization!;
                 const { userId } = req.query;
                 const result = await db.getUser(token, userId as string);
 
-                if (result instanceof ChitterError) {
-                    return res.status(400).json({ success: false, error: result.reason });
-                }
-
-                res.json({ success: true, data: result });
+                if (result instanceof ChitterError) return apiError<ErrorGetUser>(res, result.reason);
+                apiSuccess<SuccessGetUser>(res, result);
             } catch (err) {
                 console.error(err);
-                res.status(500).json({ success: false, error: "Server error occurred." });
+                apiError(res, "Unknown server error");
             }
         }
     );
@@ -483,21 +458,17 @@ const db = new ChitterDatabase(pool);
     app.get("/api/getChannels", [header("authorization").notEmpty()], async (req: Request, res: Response) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
-            return res.status(400).json({ success: false, errors: errors.array() });
+            return apiError(res, "Invalid parameters", errors.array());
         }
 
         try {
             const token = req.headers.authorization!;
             const result = await db.getChannels(token);
-
-            if (result instanceof ChitterError) {
-                return res.status(400).json({ success: false, error: result.reason });
-            }
-
-            res.json({ success: true, data: result });
+            if (result instanceof ChitterError) return apiError<ErrorGetChannels>(res, result.reason);
+            apiSuccess<SuccessGetChannels>(res, result);
         } catch (err) {
             console.error(err);
-            res.status(500).json({ success: false, error: "Server error occurred." });
+            apiError(res, "Unknown server error");
         }
     });
 
@@ -506,23 +477,18 @@ const db = new ChitterDatabase(pool);
         [header("authorization").notEmpty(), body("displayName").isString().trim().notEmpty(), body("isPrivate").isBoolean()],
         async (req: Request, res: Response) => {
             const errors = validationResult(req);
-            if (!errors.isEmpty()) {
-                return res.status(400).json({ success: false, errors: errors.array() });
-            }
+            if (!errors.isEmpty()) return apiError(res, "Invalid parameters", errors.array());
 
             try {
                 const adminToken = req.headers.authorization!;
                 const { displayName, isPrivate } = req.body;
                 const channelId = await db.createChannel(adminToken, displayName, isPrivate);
 
-                if (channelId instanceof ChitterError) {
-                    return res.status(400).json({ success: false, error: channelId.reason });
-                }
-
-                res.json({ success: true, channelId });
+                if (channelId instanceof ChitterError) return apiError<ErrorCreateChannel>(res, channelId.reason);
+                apiSuccess<SuccessCreateChannel>(res, channelId);
             } catch (err) {
                 console.error(err);
-                res.status(500).json({ success: false, error: "Server error occurred." });
+                apiError(res, "Unknown server error");
             }
         }
     );
@@ -532,23 +498,18 @@ const db = new ChitterDatabase(pool);
         [header("authorization").notEmpty(), body("channelId").isString().trim().notEmpty()],
         async (req: Request, res: Response) => {
             const errors = validationResult(req);
-            if (!errors.isEmpty()) {
-                return res.status(400).json({ success: false, errors: errors.array() });
-            }
+            if (!errors.isEmpty()) return apiError(res, "Invalid parameters", errors.array());
 
             try {
                 const adminToken = req.headers.authorization!;
                 const { channelId } = req.body;
                 const result = await db.removeChannel(adminToken, channelId);
 
-                if (result instanceof ChitterError) {
-                    return res.status(400).json({ success: false, error: result.reason });
-                }
-
-                res.json({ success: true, message: "Channel removed successfully" });
+                if (result instanceof ChitterError) return apiError<ErrorRemoveChannel>(res, result.reason);
+                apiSuccess<SuccessRemoveChannel>(res);
             } catch (err) {
                 console.error(err);
-                res.status(500).json({ success: false, error: "Server error occurred." });
+                apiError(res, "Unknown server error");
             }
         }
     );
@@ -563,23 +524,18 @@ const db = new ChitterDatabase(pool);
         ],
         async (req: Request, res: Response) => {
             const errors = validationResult(req);
-            if (!errors.isEmpty()) {
-                return res.status(400).json({ success: false, errors: errors.array() });
-            }
+            if (!errors.isEmpty()) return apiError(res, "Invalid parameters", errors.array());
 
             try {
                 const adminToken = req.headers.authorization!;
                 const { channelId, displayName, description } = req.body;
                 const result = await db.updateChannel(adminToken, channelId, displayName, description);
 
-                if (result instanceof ChitterError) {
-                    return res.status(400).json({ success: false, error: result.reason });
-                }
-
-                res.json({ success: true, message: "Channel updated successfully" });
+                if (result instanceof ChitterError) return apiError<ErrorUpdateChannel>(res, result.reason);
+                apiSuccess<SuccessUpdateChannel>(res);
             } catch (err) {
                 console.error(err);
-                res.status(500).json({ success: false, error: "Server error occurred." });
+                apiError(res, "Unknown server error");
             }
         }
     );
@@ -589,23 +545,18 @@ const db = new ChitterDatabase(pool);
         [header("authorization").notEmpty(), body("userId").isString().trim().notEmpty(), body("channelId").isString().trim().notEmpty()],
         async (req: Request, res: Response) => {
             const errors = validationResult(req);
-            if (!errors.isEmpty()) {
-                return res.status(400).json({ success: false, errors: errors.array() });
-            }
+            if (!errors.isEmpty()) return apiError(res, "Invalid parameters", errors.array());
 
             try {
                 const adminToken = req.headers.authorization!;
                 const { userId, channelId } = req.body;
                 const result = await db.addUserToChannel(adminToken, userId, channelId);
 
-                if (result instanceof ChitterError) {
-                    return res.status(400).json({ success: false, error: result.reason });
-                }
-
-                res.json({ success: true, message: "User added to channel successfully" });
+                if (result instanceof ChitterError) return apiError<ErrorAddUserToChannel>(res, result.reason);
+                apiSuccess<SuccessAddUserToChannel>(res);
             } catch (err) {
                 console.error(err);
-                res.status(500).json({ success: false, error: "Server error occurred." });
+                apiError(res, "Unknown server error");
             }
         }
     );
@@ -615,23 +566,18 @@ const db = new ChitterDatabase(pool);
         [header("authorization").notEmpty(), body("userId").isString().trim().notEmpty(), body("channelId").isString().trim().notEmpty()],
         async (req: Request, res: Response) => {
             const errors = validationResult(req);
-            if (!errors.isEmpty()) {
-                return res.status(400).json({ success: false, errors: errors.array() });
-            }
+            if (!errors.isEmpty()) return apiError(res, "Invalid parameters", errors.array());
 
             try {
                 const adminToken = req.headers.authorization!;
                 const { userId, channelId } = req.body;
                 const result = await db.removeUserFromChannel(adminToken, userId, channelId);
 
-                if (result instanceof ChitterError) {
-                    return res.status(400).json({ success: false, error: result.reason });
-                }
-
-                res.json({ success: true, message: "User removed from channel successfully" });
+                if (result instanceof ChitterError) return apiError<ErrorRemoveUserFromChannel>(res, result.reason);
+                apiSuccess<SuccessRemoveUserFromChannel>(res);
             } catch (err) {
                 console.error(err);
-                res.status(500).json({ success: false, error: "Server error occurred." });
+                apiError(res, "Unknown server error");
             }
         }
     );
@@ -648,14 +594,12 @@ const db = new ChitterDatabase(pool);
 
             if (!type || !["image", "video", "application"].includes(type)) {
                 fs.unlinkSync(filePath); // Remove the temporarily stored file
-                return res.status(400).json({ success: false, error: "Invalid file type" });
+                return apiError<ErrorUploadAttachment>(res, "Invalid file type");
             }
 
-            let width, height;
-            if (type === "image") {
-                const dimensions = await sharp(filePath).metadata();
-                width = dimensions.width;
-                height = dimensions.height;
+            let width: number | undefined, height: number | undefined;
+            if (type === "image" || type == "video") {
+                // FIXME get image width/height
             }
 
             const token = req.headers.authorization!; // Assuming token is sent in authorization header
@@ -671,40 +615,38 @@ const db = new ChitterDatabase(pool);
 
             if (attachment instanceof ChitterError) {
                 fs.unlinkSync(filePath); // Clean up the file if there's a database error
-                return res.status(400).json({ success: false, error: attachment.reason });
+                return apiError<ErrorUploadAttachment>(res, attachment.reason);
             }
 
-            res.json({ success: true, attachment });
+            apiSuccess<SuccessUploadAttachment>(res, attachment);
         } catch (err) {
-            console.error(err);
             if (req.file?.path) {
                 fs.unlinkSync(req.file.path); // Ensure temporary file is deleted in case of error
             }
-            res.status(500).json({ success: false, error: "Server error occurred." });
+            console.error(err);
+            apiError(res, "Unknown server error");
         }
     });
 
-    app.delete("/api/removeAttachment", async (req: Request, res: Response) => {
-        const token = req.headers.authorization;
-        const attachmentId = req.body.attachmentId; // Assuming the attachment ID is sent in the request body
+    app.delete(
+        "/api/removeAttachment",
+        [header("authorization").notEmpty(), body("userId").isString().trim().notEmpty(), body("channelId").isString().trim().notEmpty()],
+        async (req: Request, res: Response) => {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) return apiError(res, "Invalid parameters", errors.array());
 
-        if (!token || !attachmentId) {
-            return res.status(400).json({ success: false, error: "Token and attachment ID are required" });
-        }
-
-        try {
-            await db.removeAttachment(token, attachmentId);
-
-            res.json({ success: true, message: "Attachment removed successfully" });
-        } catch (error) {
-            if (error instanceof ChitterError) {
-                return res.status(400).json({ success: false, error: error.reason });
+            try {
+                const token = req.headers.authorization!;
+                const attachmentId = req.body.attachmentId; // Assuming the attachment ID is sent in the request body
+                const result = await db.removeAttachment(token, attachmentId);
+                if (result instanceof ChitterError) return apiError<ErrorRemoveAttachment>(res, result.reason);
+                apiSuccess<SuccessRemoveAttachment>(res);
+            } catch (error) {
+                console.error(error);
+                apiError(res, "Unknown server error");
             }
-
-            console.error(error);
-            res.status(500).json({ success: false, error: "Server error occurred." });
         }
-    });
+    );
 
     const server = http.createServer(app);
     server.listen(port, async () => {
@@ -714,7 +656,7 @@ const db = new ChitterDatabase(pool);
     setupLiveReload(server);
 })();
 
-async function connectWithRetry(maxRetries = 5, interval = 2000) {
+async function waitForDatabase(maxRetries = 5, interval = 2000) {
     let retries = 0;
     while (retries < maxRetries) {
         try {

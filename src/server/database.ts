@@ -11,8 +11,8 @@ import {
     ErrorCreateInviteCode,
     ErrorCreateMessage,
     ErrorCreateRoomAndAdmin,
-    ErrorCreateTransferBundleFromCode,
-    ErrorCreateTransferCode,
+    ErrorGetTransferBundleFromCode,
+    ErrorCreateTransferBundle,
     ErrorCreateUserFromInviteCode,
     ErrorEditMessage,
     ErrorGetChannels,
@@ -33,9 +33,31 @@ import {
     Facet,
     Message,
     Room,
+    SuccessAddUserToChannel,
+    SuccessCreateChannel,
+    SuccessCreateInviteCode,
+    SuccessCreateMessage,
+    SuccessCreateRoomAndAdmin,
+    SuccessCreateUserFromInviteCode,
+    SuccessEditMessage,
+    SuccessGetChannels,
+    SuccessGetMessages,
+    SuccessGetUser,
+    SuccessGetUsers,
+    SuccessRemoveAttachment,
+    SuccessRemoveChannel,
+    SuccessRemoveUserFromChannel,
+    SuccessSetUserRole,
+    SuccessUpdateChannel,
+    SuccessUpdateRoom,
+    SuccessUpdateUser,
+    SuccessUploadAttachment,
+    SuccessRemoveUser,
     UUID,
     User,
     sanitizeMessageContent,
+    SuccessCreateTransferBundle,
+    SuccessGetTransferBundleFromCode,
 } from "../common/common.js";
 
 export class ChitterDatabase {
@@ -131,7 +153,7 @@ export class ChitterDatabase {
         roomName: string,
         adminName: string,
         adminInviteOnly: boolean
-    ): Promise<ErrorCreateRoomAndAdmin | { room: Room; admin: User; generalChannel: Channel }> {
+    ): Promise<ChitterError<ErrorCreateRoomAndAdmin> | SuccessCreateRoomAndAdmin> {
         const client = await this.pool.connect();
         try {
             await client.query("BEGIN");
@@ -200,7 +222,7 @@ export class ChitterDatabase {
         });
     }
 
-    async createInviteCode(userToken: string): Promise<ErrorCreateInviteCode | string> {
+    async createInviteCode(userToken: string): Promise<ChitterError<ErrorCreateInviteCode> | SuccessCreateInviteCode> {
         const client = await this.pool.connect();
         try {
             const userQuery = `
@@ -231,7 +253,10 @@ export class ChitterDatabase {
         }
     }
 
-    async createUserFromInviteCode(inviteCode: string, displayName: string): Promise<ErrorCreateUserFromInviteCode | User> {
+    async createUserFromInviteCode(
+        inviteCode: string,
+        displayName: string
+    ): Promise<ChitterError<ErrorCreateUserFromInviteCode> | SuccessCreateUserFromInviteCode> {
         const client = await this.pool.connect();
         try {
             // Check if invite code is valid
@@ -280,7 +305,7 @@ export class ChitterDatabase {
         }
     }
 
-    async removeUser(userId: string, adminToken: string): Promise<ErrorRemoveUser | void> {
+    async removeUser(userId: string, adminToken: string): Promise<ChitterError<ErrorRemoveUser> | SuccessRemoveUser> {
         const client = await this.pool.connect();
         try {
             await client.query("BEGIN");
@@ -324,7 +349,7 @@ export class ChitterDatabase {
         }
     }
 
-    async createTransferCode(userTokens: string[]): Promise<ErrorCreateTransferCode | string> {
+    async createTransferBundle(userTokens: string[]): Promise<ChitterError<ErrorCreateTransferBundle> | SuccessCreateTransferBundle> {
         const client = await this.pool.connect();
         try {
             const userQuery = `SELECT id FROM users WHERE token = ANY($1::text[]);`;
@@ -351,7 +376,7 @@ export class ChitterDatabase {
         }
     }
 
-    async createTransferBundleFromCode(transferCode: string): Promise<ErrorCreateTransferBundleFromCode | User[]> {
+    async getTransferBundleFromCode(transferCode: string): Promise<ChitterError<ErrorGetTransferBundleFromCode> | SuccessGetTransferBundleFromCode> {
         const transferData = this.transferCodes.get(transferCode);
         if (!transferData || transferData.expiresAt < new Date()) {
             return new ChitterError("Invalid or expired transfer code");
@@ -388,7 +413,7 @@ export class ChitterDatabase {
         content: { text: string; facets: Facet[]; embed?: Embed; attachmentIds?: string[] },
         channelId?: UUID, // Optional, for channel messages
         directMessageUserId?: UUID // Optional, for direct messages
-    ): Promise<ErrorCreateMessage | number> {
+    ): Promise<ChitterError<ErrorCreateMessage> | SuccessCreateMessage> {
         const client = await this.pool.connect();
         try {
             await client.query("BEGIN");
@@ -456,7 +481,7 @@ export class ChitterDatabase {
         }
     }
 
-    async removeMessage(userToken: string, messageId: string): Promise<ErrorRemoveMessage | void> {
+    async removeMessage(userToken: string, messageId: string): Promise<ChitterError<ErrorRemoveMessage> | void> {
         const client = await this.pool.connect();
         try {
             await client.query("BEGIN");
@@ -503,7 +528,7 @@ export class ChitterDatabase {
         userToken: string,
         messageId: string,
         content: { text: string; facets: Facet[]; embed?: Embed; attachmentIds?: string[] }
-    ): Promise<ErrorEditMessage | void> {
+    ): Promise<ChitterError<ErrorEditMessage> | SuccessEditMessage> {
         const client = await this.pool.connect();
         try {
             await client.query("BEGIN");
@@ -571,7 +596,7 @@ export class ChitterDatabase {
         adminInviteOnly: boolean,
         description?: string,
         logoId?: string
-    ): Promise<ErrorUpdateRoom | void> {
+    ): Promise<ChitterError<ErrorUpdateRoom> | SuccessUpdateRoom> {
         const client = await this.pool.connect();
         try {
             await client.query("BEGIN");
@@ -611,7 +636,12 @@ export class ChitterDatabase {
         }
     }
 
-    async updateUser(userToken: string, displayName: string, description?: string, avatar?: UUID): Promise<ErrorUpdateUser | void> {
+    async updateUser(
+        userToken: string,
+        displayName: string,
+        description?: string,
+        avatar?: UUID
+    ): Promise<ChitterError<ErrorUpdateUser> | SuccessUpdateUser> {
         const client = await this.pool.connect();
         try {
             await client.query("BEGIN");
@@ -652,7 +682,11 @@ export class ChitterDatabase {
         }
     }
 
-    async setUserRole(adminToken: string, userId: string, role: "admin" | "participant"): Promise<ErrorSetUserRole | void> {
+    async setUserRole(
+        adminToken: string,
+        userId: string,
+        role: "admin" | "participant"
+    ): Promise<ChitterError<ErrorSetUserRole> | SuccessSetUserRole> {
         const client = await this.pool.connect();
         try {
             await client.query("BEGIN");
@@ -693,7 +727,7 @@ export class ChitterDatabase {
         directMessageUserId?: UUID, // Optional: for fetching direct messages between two users
         cursor?: string,
         limit: number = 25
-    ): Promise<ErrorGetMessages | Message[]> {
+    ): Promise<ChitterError<ErrorGetMessages> | SuccessGetMessages> {
         const client = await this.pool.connect();
         try {
             // Validate userToken
@@ -782,7 +816,7 @@ export class ChitterDatabase {
     async getUsers(
         userToken: string,
         channelId?: UUID // Optional: for fetching users from a specific channel
-    ): Promise<ErrorGetUsers | User[]> {
+    ): Promise<ChitterError<ErrorGetUsers> | SuccessGetUsers> {
         const client = await this.pool.connect();
         try {
             // Validate userToken and retrieve the user's room_id
@@ -838,7 +872,7 @@ export class ChitterDatabase {
         }
     }
 
-    async getUser(userToken: string, userId: UUID): Promise<ErrorGetUser | User> {
+    async getUser(userToken: string, userId: UUID): Promise<ChitterError<ErrorGetUser> | SuccessGetUser> {
         const client = await this.pool.connect();
         try {
             // Validate userToken
@@ -875,7 +909,7 @@ export class ChitterDatabase {
         }
     }
 
-    async getChannels(userToken: string): Promise<ErrorGetChannels | Channel[]> {
+    async getChannels(userToken: string): Promise<ChitterError<ErrorGetChannels> | SuccessGetChannels> {
         const client = await this.pool.connect();
         try {
             // Validate userToken
@@ -917,7 +951,11 @@ export class ChitterDatabase {
         }
     }
 
-    async createChannel(adminToken: string, displayName: string, isPrivate: boolean): Promise<ErrorCreateChannel | UUID> {
+    async createChannel(
+        adminToken: string,
+        displayName: string,
+        isPrivate: boolean
+    ): Promise<ChitterError<ErrorCreateChannel> | SuccessCreateChannel> {
         const client = await this.pool.connect();
         try {
             await client.query("BEGIN");
@@ -953,7 +991,7 @@ export class ChitterDatabase {
         }
     }
 
-    async removeChannel(adminToken: string, channelId: UUID): Promise<ErrorRemoveChannel | void> {
+    async removeChannel(adminToken: string, channelId: UUID): Promise<ChitterError<ErrorRemoveChannel> | SuccessRemoveChannel> {
         const client = await this.pool.connect();
         try {
             await client.query("BEGIN");
@@ -981,7 +1019,12 @@ export class ChitterDatabase {
         }
     }
 
-    async updateChannel(adminToken: string, channelId: UUID, displayName: string, description: string): Promise<ErrorUpdateChannel | void> {
+    async updateChannel(
+        adminToken: string,
+        channelId: UUID,
+        displayName: string,
+        description: string
+    ): Promise<ChitterError<ErrorUpdateChannel> | SuccessUpdateChannel> {
         const client = await this.pool.connect();
         try {
             await client.query("BEGIN");
@@ -1013,7 +1056,11 @@ export class ChitterDatabase {
         }
     }
 
-    async addUserToChannel(adminToken: string, userId: UUID, channelId: UUID): Promise<ErrorAddUserToChannel | void> {
+    async addUserToChannel(
+        adminToken: string,
+        userId: UUID,
+        channelId: UUID
+    ): Promise<ChitterError<ErrorAddUserToChannel> | SuccessAddUserToChannel> {
         const client = await this.pool.connect();
         try {
             await client.query("BEGIN");
@@ -1048,7 +1095,11 @@ export class ChitterDatabase {
         }
     }
 
-    async removeUserFromChannel(adminToken: string, userId: UUID, channelId: UUID): Promise<ErrorRemoveUserFromChannel | void> {
+    async removeUserFromChannel(
+        adminToken: string,
+        userId: UUID,
+        channelId: UUID
+    ): Promise<ChitterError<ErrorRemoveUserFromChannel> | SuccessRemoveUserFromChannel> {
         const client = await this.pool.connect();
         try {
             await client.query("BEGIN");
@@ -1093,7 +1144,7 @@ export class ChitterDatabase {
             height?: number;
             createdAt: number;
         }
-    ): Promise<Attachment | ErrorUploadAttachment> {
+    ): Promise<ChitterError<ErrorUploadAttachment> | SuccessUploadAttachment> {
         const client = await this.pool.connect();
 
         try {
@@ -1133,7 +1184,7 @@ export class ChitterDatabase {
         }
     }
 
-    async removeAttachment(token: string, attachmentId: string): Promise<void | ErrorRemoveAttachment> {
+    async removeAttachment(token: string, attachmentId: string): Promise<ChitterError<ErrorRemoveAttachment> | SuccessRemoveAttachment> {
         const client = await this.pool.connect();
 
         try {

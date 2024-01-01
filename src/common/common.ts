@@ -130,7 +130,11 @@ export type ErrorReason =
     | "Invalid token"
     | "Could not upload attachment"
     | "Could not remove attachment"
-    | "Attachment not found";
+    | "Attachment not found"
+    | "Unexpected error"
+    | "Unknown server error"
+    | "Invalid parameters"
+    | "Invalid file type";
 
 export class ChitterError<T extends ErrorReason> extends Error {
     constructor(readonly reason: T, readonly e?: any) {
@@ -139,108 +143,130 @@ export class ChitterError<T extends ErrorReason> extends Error {
     }
 }
 
-export type ErrorSanitizeMessageContent = ChitterError<
-    Extract<ErrorReason, "Invalid content structure" | "Invalid text content" | "Invalid facet" | "Invalid embed">
+export type ErrorSanitizeMessageContent = Extract<
+    ErrorReason,
+    "Invalid content structure" | "Invalid text content" | "Invalid facet" | "Invalid embed"
 >;
 
-export type ErrorCreateRoomAndAdmin = ChitterError<Extract<ErrorReason, "Could not create room and admin" | "Invalid parameter">>;
+export type SuccessCreateRoomAndAdmin = { room: Room; admin: User; generalChannel: Channel };
+export type ErrorCreateRoomAndAdmin = Extract<ErrorReason, "Could not create room and admin">;
 
-export type ErrorCreateInviteCode = ChitterError<
-    Extract<ErrorReason, "User not found" | "User is not an admin and room is admin invite only" | "Could not create invite code">
+export type SuccessCreateInviteCode = string;
+export type ErrorCreateInviteCode = Extract<
+    ErrorReason,
+    "User not found" | "User is not an admin and room is admin invite only" | "Could not create invite code"
 >;
 
-export type ErrorCreateUserFromInviteCode = ChitterError<
-    Extract<ErrorReason, "Invalid invite code" | "Display name already exists in the room" | "Could not create user from invite code">
+export type SuccessCreateUserFromInviteCode = User;
+export type ErrorCreateUserFromInviteCode = Extract<
+    ErrorReason,
+    "Invalid invite code" | "Display name already exists in the room" | "Could not create user from invite code"
 >;
 
-export type ErrorRemoveUser = ChitterError<Extract<ErrorReason, "Invalid admin token" | "User not found in admin's room" | "Could not remove user">>;
+export type SuccessRemoveUser = void;
+export type ErrorRemoveUser = Extract<ErrorReason, "Invalid admin token" | "User not found in admin's room" | "Could not remove user">;
 
-export type ErrorCreateTransferCode = ChitterError<Extract<ErrorReason, "No valid tokens" | "Could not create transfer code">>;
-export type ErrorCreateTransferBundleFromCode = ChitterError<
-    Extract<ErrorReason, "Invalid or expired transfer code" | "Could not fetch user data from transfer code">
+export type SuccessCreateTransferBundle = string;
+export type ErrorCreateTransferBundle = Extract<ErrorReason, "No valid tokens" | "Could not create transfer code">;
+
+export type SuccessGetTransferBundleFromCode = User[];
+export type ErrorGetTransferBundleFromCode = Extract<
+    ErrorReason,
+    "Invalid or expired transfer code" | "Could not fetch user data from transfer code"
 >;
 
-export type ErrorCreateMessage = ChitterError<
-    Extract<
-        ErrorReason,
-        | "Invalid user token"
-        | "Could not create message"
-        | "Invalid content structure"
-        | "Invalid text content"
-        | "Invalid facet"
-        | "Invalid embed"
-        | "Invalid attachment IDs"
-        | "Message cannot target both a channel and a direct user"
-        | "Channel not found in user's room"
-        | "User is not a member of the private channel"
-    >
+export type SuccessCreateMessage = number;
+export type ErrorCreateMessage = Extract<
+    ErrorReason,
+    | "Invalid user token"
+    | "Could not create message"
+    | "Invalid content structure"
+    | "Invalid text content"
+    | "Invalid facet"
+    | "Invalid embed"
+    | "Invalid attachment IDs"
+    | "Message cannot target both a channel and a direct user"
+    | "Channel not found in user's room"
+    | "User is not a member of the private channel"
 >;
 
-export type ErrorRemoveMessage = ChitterError<
-    Extract<ErrorReason, "Invalid user token" | "Message not found" | "User not authorized to delete this message" | "Could not remove message">
+export type SuccessRemoveMessage = void;
+export type ErrorRemoveMessage = Extract<
+    ErrorReason,
+    "Invalid user token" | "Message not found" | "User not authorized to delete this message" | "Could not remove message"
 >;
 
-export type ErrorEditMessage = ChitterError<
-    Extract<
-        ErrorReason,
-        | "Invalid user token"
-        | "Message not found"
-        | "User not authorized to edit this message"
-        | "Could not edit message"
-        | "Invalid content structure"
-        | "Invalid text content"
-        | "Invalid facet"
-        | "Invalid embed"
-        | "Invalid attachment IDs"
-    >
+export type SuccessEditMessage = void;
+export type ErrorEditMessage = Extract<
+    ErrorReason,
+    | "Invalid user token"
+    | "Message not found"
+    | "User not authorized to edit this message"
+    | "Could not edit message"
+    | "Invalid content structure"
+    | "Invalid text content"
+    | "Invalid facet"
+    | "Invalid embed"
+    | "Invalid attachment IDs"
 >;
 
-export type ErrorUpdateRoom = ChitterError<
-    Extract<ErrorReason, "Invalid admin token" | "Invalid or non-image logo attachment" | "Could not update room">
+export type SuccessUpdateRoom = void;
+export type ErrorUpdateRoom = Extract<ErrorReason, "Invalid admin token" | "Invalid or non-image logo attachment" | "Could not update room">;
+
+export type SuccessUpdateUser = void;
+export type ErrorUpdateUser = Extract<ErrorReason, "Invalid user token" | "Invalid or non-image avatar attachment" | "Could not update user">;
+
+export type SuccessSetUserRole = void;
+export type ErrorSetUserRole = Extract<
+    ErrorReason,
+    "Invalid admin token or non-admin user" | "User not found in admin's room" | "Could not change user role"
 >;
 
-export type ErrorUpdateUser = ChitterError<
-    Extract<ErrorReason, "Invalid user token" | "Invalid or non-image avatar attachment" | "Could not update user">
+export type SuccessGetMessages = Message[];
+export type ErrorGetMessages = Extract<
+    ErrorReason,
+    | "Invalid user token"
+    | "Could not get messages"
+    | "Either channelId or directMessageUserId must be provided"
+    | "User is not a member of the private channel"
+    | "Channel not found in user's room"
 >;
 
-export type ErrorSetUserRole = ChitterError<
-    Extract<ErrorReason, "Invalid admin token or non-admin user" | "User not found in admin's room" | "Could not change user role">
+export type SuccessGetUsers = User[];
+export type ErrorGetUsers = Extract<ErrorReason, "Invalid user token" | "Could not get users">;
+
+export type SuccessGetUser = User;
+export type ErrorGetUser = Extract<ErrorReason, "Invalid user token" | "User not found" | "Could not retrieve user details">;
+
+export type SuccessGetChannels = Channel[];
+export type ErrorGetChannels = Extract<ErrorReason, "Invalid user token" | "Could not retrieve channels">;
+
+export type SuccessCreateChannel = UUID;
+export type ErrorCreateChannel = Extract<ErrorReason, "Invalid admin token or non-admin user" | "Could not create channel">;
+
+export type SuccessRemoveChannel = void;
+export type ErrorRemoveChannel = Extract<ErrorReason, "Invalid admin token or non-admin user" | "Could not remove channel">;
+
+export type SuccessUpdateChannel = void;
+export type ErrorUpdateChannel = Extract<ErrorReason, "Invalid admin token or non-admin user" | "Could not update channel">;
+
+export type SuccessAddUserToChannel = void;
+export type ErrorAddUserToChannel = Extract<
+    ErrorReason,
+    "Invalid admin token or non-admin user" | "Channel not found or not private" | "Could not add user to channel"
 >;
 
-export type ErrorGetMessages = ChitterError<
-    Extract<
-        ErrorReason,
-        | "Invalid user token"
-        | "Could not get messages"
-        | "Either channelId or directMessageUserId must be provided"
-        | "User is not a member of the private channel"
-        | "Channel not found in user's room"
-    >
+export type SuccessRemoveUserFromChannel = void;
+export type ErrorRemoveUserFromChannel = Extract<
+    ErrorReason,
+    "Invalid admin token or non-admin user" | "Channel not found or not private" | "Could not remove user from channel"
 >;
 
-export type ErrorGetUsers = ChitterError<Extract<ErrorReason, "Invalid user token" | "Could not get users">>;
+export type SuccessUploadAttachment = Attachment;
+export type ErrorUploadAttachment = Extract<ErrorReason, "Invalid token" | "Could not upload attachment" | "Invalid file type">;
 
-export type ErrorGetUser = ChitterError<Extract<ErrorReason, "Invalid user token" | "User not found" | "Could not retrieve user details">>;
-
-export type ErrorGetChannels = ChitterError<Extract<ErrorReason, "Invalid user token" | "Could not retrieve channels">>;
-
-export type ErrorCreateChannel = ChitterError<Extract<ErrorReason, "Invalid admin token or non-admin user" | "Could not create channel">>;
-
-export type ErrorRemoveChannel = ChitterError<Extract<ErrorReason, "Invalid admin token or non-admin user" | "Could not remove channel">>;
-
-export type ErrorUpdateChannel = ChitterError<Extract<ErrorReason, "Invalid admin token or non-admin user" | "Could not update channel">>;
-
-export type ErrorAddUserToChannel = ChitterError<
-    Extract<ErrorReason, "Invalid admin token or non-admin user" | "Channel not found or not private" | "Could not add user to channel">
->;
-
-export type ErrorRemoveUserFromChannel = ChitterError<
-    Extract<ErrorReason, "Invalid admin token or non-admin user" | "Channel not found or not private" | "Could not remove user from channel">
->;
-
-export type ErrorUploadAttachment = ChitterError<Extract<ErrorReason, "Invalid token" | "Could not upload attachment">>;
-
-export type ErrorRemoveAttachment = ChitterError<Extract<ErrorReason, "Invalid token" | "Could not remove attachment" | "Attachment not found">>;
+export type SuccessRemoveAttachment = void;
+export type ErrorRemoveAttachment = Extract<ErrorReason, "Invalid token" | "Could not remove attachment" | "Attachment not found">;
 
 function sanitizeFacet(facet: any): Facet | undefined {
     if (!facet || typeof facet !== "object") {
@@ -319,7 +345,7 @@ export function sanitizeMessageContent(content: any):
           embed?: Embed;
           attachmentIds?: string[];
       }
-    | ErrorSanitizeMessageContent {
+    | ChitterError<ErrorSanitizeMessageContent> {
     if (typeof content !== "object" || content === null) {
         return new ChitterError("Invalid content structure");
     }
@@ -356,4 +382,21 @@ export function sanitizeMessageContent(content: any):
     }
 
     return sanitizedContent;
+}
+
+export interface JsonValue {
+    [key: string]: any;
+}
+
+export type ApiResponse<T, E extends ErrorReason = ErrorReason> = ApiResponseSuccess<T> | ApiResponseError<E>;
+
+interface ApiResponseSuccess<T> {
+    success: true;
+    data: T;
+}
+
+export interface ApiResponseError<E extends ErrorReason> {
+    success: false;
+    error: E | "Invalid parameters" | "Unknown server error";
+    validationErrors?: any;
 }

@@ -1,18 +1,17 @@
-import { LitElement, PropertyValueMap, html } from "lit";
+import { LitElement, PropertyValueMap, html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { Api } from "../api.js";
-import { renderError } from "../app.js";
+import { BaseElement, renderError } from "../app.js";
 import { i18n } from "../utils/i18n.js";
 import { router } from "../utils/routing.js";
 import { pageContainerStyle, pageContentStyle } from "../utils/styles.js";
+import { sleep } from "../utils/utils.js";
+import { speechBubbleIcon } from "../utils/icons.js";
 
 @customElement("main-page")
-export class MainPage extends LitElement {
+export class MainPage extends BaseElement {
     @property()
-    isLoading = true;
-
-    @property()
-    message?: string;
+    isCreating = false;
 
     @property()
     error?: string;
@@ -21,33 +20,63 @@ export class MainPage extends LitElement {
         return this;
     }
 
-    protected firstUpdated(_changedProperties: PropertyValueMap<any> | Map<PropertyKey, unknown>): void {
-        super.firstUpdated(_changedProperties);
-        this.load();
-    }
-
-    async load() {
-        try {
-            const result = await Api.hello();
-            if (result instanceof Error) throw result;
-            this.message = result.message;
-        } catch (e) {
-            this.error = i18n("Couldn't load mesage");
-            return;
-        } finally {
-            this.isLoading = false;
-        }
-    }
-
     render() {
-        if (this.isLoading) return html`<loading-spinner></loading-spinner>`;
-        if (this.error) return renderError(this.error);
-        if (!this.message) return renderError(i18n("Couldn't load mesage"));
+        if (this.isCreating)
+            return html`<div class="${pageContainerStyle}">
+                <div class="${pageContentStyle} items-center justify-center">
+                    <h1 class="text-center mt-8 mb-8">chitter</h1>
+                    <span>${i18n("Creating chat ...")}</span>
+                    <loading-spinner class="mt-2"></loading-spinner>
+                </div>
+            </div>`;
+
         return html`<div class="${pageContainerStyle}">
-            <div class="${pageContentStyle}">
-                <h1>${this.message}</h1>
-                <button class="btn self-start" @click=${() => router.push("/settings")}>Settings</button>
+            <div class="${pageContentStyle} items-center justify-center">
+                <h1 class="text-center mt-8 mb-4 flex items-center gap-2"><i class="icon w-6 h-6">${speechBubbleIcon}</i><span>chitter</span></h1>
+                <span class="text-sm italic mb-4">${i18n("Chat with family and friends")}</span>
+                ${this.error ? html`<div class="w-full max-w-[320px]">${renderError(this.error)}</div>` : nothing}
+                <div class="flex flex-col w-full max-w-[320px] mt-2">
+                    <span class="text-xs text-muted-fg">${i18n("Chat name")}</span>
+                    <input id="roomName" class="textfield" />
+                    <span class="text-xs text-muted-fg mt-2">${i18n("User name")}</span>
+                    <input id="userName" class="textfield" />
+                    <div class="flex justify-center items-center gap-1 mt-2 cursor-pointer">
+                        <input id="adminInviteOnly" type="checkbox" class="cursor-pointer" checked /><span
+                            class="text-xs"
+                            @click=${(ev: Event) =>
+                                (this.querySelector<HTMLInputElement>("#adminInviteOnly")!.checked =
+                                    !this.querySelector<HTMLInputElement>("#adminInviteOnly")!.checked)}
+                            >${i18n("Only admins can invite")}</span
+                        >
+                    </div>
+                    <button class="button" @click=${() => this.createChat()}>${i18n("Create chat")}</button>
+                </div>
             </div>
         </div>`;
+    }
+
+    async createChat() {
+        this.error = undefined;
+
+        const roomName = this.querySelector<HTMLInputElement>("#roomName")?.value;
+        if (!roomName) {
+            this.error = i18n("Please specify a chat name");
+            return;
+        }
+
+        const userName = this.querySelector<HTMLInputElement>("#userName")?.value;
+        if (!userName) {
+            this.error = i18n("Please specify a user name");
+            return;
+        }
+
+        const adminInviteOnly = this.querySelector<HTMLInputElement>("#adminInviteOnly")?.checked ?? true;
+
+        this.isCreating = true;
+        try {
+            const result = await Api.createRoomAndAdmin(roomName, userName, adminInviteOnly);
+        } finally {
+            this.isCreating = false;
+        }
     }
 }
