@@ -6,7 +6,7 @@ import express, { Request, Response } from "express";
 import * as fs from "fs";
 import * as http from "http";
 import WebSocket, { WebSocketServer } from "ws";
-import type { Pool } from "pg";
+import { Pool } from "pg";
 import { sleep } from "../utils/utils";
 import { PostgresChitterDatabase } from "./database-postgres";
 import {
@@ -63,10 +63,10 @@ import { body, header, query, validationResult } from "express-validator";
 import multer from "multer";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
-import { fileTypeFromFile } from "file-type";
+import { fromFile as fileTypeFromFile } from "file-type";
 
 function apiSuccess<T>(res: Response, data?: T) {
-    return res.json({ sucess: true, data });
+    return res.json({ success: true, data });
 }
 
 function apiError<E extends ErrorReason = ErrorReason>(res: Response, error: E, validationErrors?: any) {

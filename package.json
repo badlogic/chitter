@@ -8,7 +8,6 @@
     "name": "chitter",
     "serverPort": 3333
   },
-  "type": "module",
   "dependencies": {
     "body-parser": "^1.20.2",
     "chokidar": "^3.5.3",
@@ -42,7 +41,7 @@
     "@types/uuid": "^9.0.7",
     "@types/ws": "^8.5.10",
     "autoprefixer": "^10.4.14",
-    "chai": "^5.0.0",
+    "chai": "4",
     "concurrently": "^8.1.0",
     "esbuild": "^0.19.11",
     "mocha": "^10.2.0",
@@ -66,7 +65,7 @@
     "clean": "rimraf html/build",
     "dev": "concurrently \"npx tsc --noEmit --preserveWatchOutput --watch\" \"npm run build:site -- --watch\" \"npm run build:css -- --watch\" \"npm run build:server -- --watch\" \"./docker/control.sh startdev\"",
     "format": "npx prettier --write .",
-    "test": "node --experimental-loader=ts-node/esm node_modules/mocha/lib/cli/cli.js src/**/*.test.ts",
+    "test": "npx mocha",
     "prepare": "husky install"
   },
   "version": "1.0.0"

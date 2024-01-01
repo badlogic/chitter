@@ -49,8 +49,8 @@ import {
     SuccessUpdateRoom,
     SuccessUpdateUser,
     SuccessUploadAttachment,
-} from "./common/common";
-import { error } from "./utils/utils";
+} from "./common";
+import { error } from "../utils/utils";
 
 function apiBaseUrl() {
     if (typeof location === "undefined") return "http://localhost:3333/api/";

@@ -1,10 +1,9 @@
-import { GenericContainer, StartedTestContainer } from "testcontainers";
-import { createApp } from "./app";
 import * as fs from "fs";
-import * as util from "util";
-import * as path from "path";
+import { GenericContainer, StartedTestContainer } from "testcontainers";
 import { Environment } from "testcontainers/build/types";
-import { Api } from "../api";
+import { Api } from "../common/api";
+import { createApp } from "./app";
+import { assert } from "chai";
 
 describe("Integration Tests", () => {
     let container: StartedTestContainer;
@@ -43,6 +42,10 @@ describe("Integration Tests", () => {
     });
 
     it("Should create a room and admin account", async () => {
-        const result = await Api.createRoomAndAdmin("room", "admin", true);
+        let result = await Api.createRoomAndAdmin("room", "admin", true);
+        assert(result.success);
+        assert(result.data.admin.displayName == "admin");
+        assert(result.data.generalChannel.displayName == "general");
+        assert(result.data.room.displayName == "room");
     });
 });

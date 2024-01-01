@@ -1,6 +1,6 @@
 import { html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
-import { Api } from "../api";
+import { Api } from "../common/api";
 import { BaseElement, renderError } from "../app";
 import { i18n } from "../utils/i18n";
 import { speechBubbleIcon } from "../utils/icons";
