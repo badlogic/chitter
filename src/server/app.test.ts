@@ -2,43 +2,52 @@ import * as fs from "fs";
 import { GenericContainer, StartedTestContainer } from "testcontainers";
 import { Environment } from "testcontainers/build/types";
 import { Api } from "../common/api";
-import { createApp } from "./app";
+import { createApp, createAppFromPool } from "./app";
 import { assert, expect } from "chai";
 import { UserBasic } from "../common/common";
+import * as pgmem from "pg-mem";
 
 describe("Integration Tests", function () {
     if (process.execArgv.some((arg) => arg.includes("--inspect"))) {
         this.timeout(0); // Disable timeout if debugger is attached
     }
 
+    const pgMem = true;
     let container: StartedTestContainer;
-    let app: ReturnType<typeof createApp>;
+    let app: ReturnType<typeof createApp | typeof createAppFromPool>;
     const tmpUploadDir = "./tmp";
     let stopApp: () => Promise<void>;
 
     before(async () => {
-        const environment: Environment = {
-            POSTGRES_DB: "testdb",
-            POSTGRES_USER: "user",
-            POSTGRES_PASSWORD: "password",
-        };
+        if (pgMem) {
+            const db = pgmem.newDb();
+            const client = db.adapters.createPg();
 
-        container = await new GenericContainer("postgres").withEnvironment(environment).withExposedPorts(5432).start();
+            stopApp = await createAppFromPool(new client.Pool(), tmpUploadDir);
+        } else {
+            const environment: Environment = {
+                POSTGRES_DB: "testdb",
+                POSTGRES_USER: "user",
+                POSTGRES_PASSWORD: "password",
+            };
 
-        const dbConfig = {
-            host: container.getHost(),
-            user: "user",
-            password: "password",
-            name: "testdb",
-            port: container.getMappedPort(5432),
-        };
+            container = await new GenericContainer("postgres").withEnvironment(environment).withExposedPorts(5432).start();
 
-        stopApp = await createApp(dbConfig, tmpUploadDir);
+            const dbConfig = {
+                host: container.getHost(),
+                user: "user",
+                password: "password",
+                name: "testdb",
+                port: container.getMappedPort(5432),
+            };
+
+            stopApp = await createApp(dbConfig, tmpUploadDir);
+        }
     });
 
     after(async () => {
         await stopApp();
-        await container.stop();
+        if (container) await container.stop();
         if (fs.existsSync(tmpUploadDir)) {
             fs.rmSync(tmpUploadDir, { recursive: true });
         }

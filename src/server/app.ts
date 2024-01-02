@@ -135,6 +135,10 @@ export async function createApp(
     });
     const result = await waitForDatabase(pool, 5, 3000);
     if (result instanceof Error) throw result;
+    return createAppFromPool(pool, uploadDirectory, port);
+}
+
+export async function createAppFromPool(pool: Pool, uploadDirectory: string, port: string | number = 3333) {
     const db = new PostgresChitterDatabase(pool);
     await db.initialize();
 

@@ -264,7 +264,7 @@ export class PostgresChitterDatabase implements Chitter {
 
             const result = { room: snakeToCamelCase(room), admin: snakeToCamelCase(admin), generalChannel: snakeToCamelCase(generalChannel) };
             result.room.createdAt = new Date(result.room.createdAt).getTime();
-            result.admin.createdAt = new Date(result.room.createdAt).getTime();
+            result.admin.createdAt = new Date(result.admin.createdAt).getTime();
             result.generalChannel.createdAt = new Date(result.room.createdAt).getTime();
             return result;
         } catch (e) {
