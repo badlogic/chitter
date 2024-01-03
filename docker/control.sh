@@ -2,6 +2,7 @@
 
 set -e
 
+COMPOSE_FORCE_COLOR=1
 project=chitter
 
 printHelp () {
@@ -37,7 +38,7 @@ start)
 	docker compose -p $project -f docker-compose.base.yml -f docker-compose.prod.yml up -d
 	;;
 startdev)
-	docker compose -p $project -f docker-compose.base.yml down -t 1
+	docker compose -p $project -f docker-compose.base.yml down
 	docker compose -p $project -f docker-compose.base.yml -f docker-compose.dev.yml build
 	docker compose -p $project -f docker-compose.base.yml -f docker-compose.dev.yml up
 	;;
@@ -46,7 +47,7 @@ reloadnginx)
 	docker exec -it ${project}_nginx nginx -s reload
 	;;
 stop)
-	docker compose -p $project -f docker-compose.base.yml down -t 1
+	docker compose -p $project -f docker-compose.base.yml down
 	;;
 shell)
 	docker exec -it ${project}_server bash

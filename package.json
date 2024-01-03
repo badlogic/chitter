@@ -65,7 +65,7 @@
     "build:server": "node ./esbuild.server.mjs",
     "build:site": "node ./esbuild.site.mjs",
     "clean": "rimraf html/build",
-    "dev": "concurrently \"npx tsc --noEmit --preserveWatchOutput --watch\" \"npm run build:site -- --watch\" \"npm run build:css -- --watch\" \"npm run build:server -- --watch\" \"./docker/control.sh startdev\"",
+    "dev": "concurrently -r \"npx tsc --noEmit --preserveWatchOutput --watch\" \"npm run build:site -- --watch\" \"npm run build:css -- --watch\" \"npm run build:server -- --watch\" \"./docker/control.sh startdev\"",
     "format": "npx prettier --write .",
     "test": "npx mocha",
     "prepare": "husky install"

@@ -68,6 +68,7 @@ import multer from "multer";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
 import { fromFile as fileTypeFromFile } from "file-type";
+import { Chitter } from "./chitter";
 
 function apiSuccess<T>(res: Response, data?: T) {
     return res.json({ success: true, data });
@@ -123,6 +124,7 @@ function setupLiveReload(server: http.Server) {
 export async function createApp(
     dbConfig: { name: string; user: string; password: string; host: string; port: number },
     uploadDirectory: string,
+    shutdownToken: string,
     port: string | number = 3333
 ) {
     // Initialize database
@@ -135,13 +137,16 @@ export async function createApp(
     });
     const result = await waitForDatabase(pool, 5, 3000);
     if (result instanceof Error) throw result;
-    return createAppFromPool(pool, uploadDirectory, port);
+    return createAppFromPool(pool, uploadDirectory, shutdownToken, port);
 }
 
-export async function createAppFromPool(pool: Pool, uploadDirectory: string, port: string | number = 3333) {
+export async function createAppFromPool(pool: Pool, uploadDirectory: string, shutdownToken: string, port: string | number = 3333) {
     const db = new PostgresChitterDatabase(pool);
     await db.initialize();
+    return createAppFromChitter(db, uploadDirectory, shutdownToken, port);
+}
 
+export async function createAppFromChitter(db: Chitter, uploadDirectory: string, shutdownToken: string, port: string | number = 3333) {
     // Initialize file upload
     if (!fs.existsSync(uploadDirectory)) {
         fs.mkdirSync(uploadDirectory, { recursive: true });
@@ -720,6 +725,21 @@ export async function createAppFromPool(pool: Pool, uploadDirectory: string, por
         }
     );
 
+    app.get("/api/shutdown", [header("authorization").notEmpty()], async (req: Request, res: Response) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) return apiError(res, "Invalid parameters", errors.array());
+
+        try {
+            const token = req.headers.authorization!;
+            if (shutdownToken != token) throw new Error();
+            await db.close();
+            apiSuccess(res);
+        } catch (error) {
+            console.error(error);
+            apiError(res, "Unknown server error");
+        }
+    });
+
     // Start server
     const server = http.createServer(app);
     server.listen(port, async () => {
@@ -733,6 +753,5 @@ export async function createAppFromPool(pool: Pool, uploadDirectory: string, por
         await server.closeAllConnections();
         await server.close();
         db.close();
-        await pool.end();
     };
 }

@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 npm run build
-host=slayer.wmarioslab.io
+host=slayer.marioslab.io
 host_dir=/home/badlogic/chitter.marioslab.io
 current_date=$(date "+%Y-%m-%d %H:%M:%S")
 commit_hash=$(git rev-parse HEAD)
@@ -12,7 +12,7 @@ rsync -avz --exclude node_modules --exclude .git --exclude data --exclude docker
 
 if [ "$1" == "server" ]; then
     echo "Publishing client & server"
-    ssh -t $host "export CHITTER_DB=$CHITTER_DB && export CHITTER_DB_USER=$CHITTER_DB_USER && export CHITTER_DB_PASSWORD=$CHITTER_DB_PASSWORD && cd $host_dir && ./docker/control.sh stop && ./docker/control.sh start && ./docker/control.sh logs"
+    ssh -t $host "export CHITTER_DB=$CHITTER_DB && export CHITTER_DB_USER=$CHITTER_DB_USER && export CHITTER_DB_PASSWORD=$CHITTER_DB_PASSWORD && export CHITTER_SHUTDOWN_TOKEN=$CHITTER_SHUTDOWN_TOKEN && cd $host_dir && ./docker/control.sh stop && ./docker/control.sh start && ./docker/control.sh logs"
 else
     echo "Publishing client only"
 fi

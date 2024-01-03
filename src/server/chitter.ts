@@ -58,6 +58,8 @@ import {
 export interface Chitter {
     initialize(): Promise<ChitterError<Extract<ErrorReason, "Could not create tables">> | void>;
 
+    close(): Promise<void>;
+
     // Rooms
     createRoomAndAdmin(
         roomName: string,
@@ -152,7 +154,7 @@ export interface Chitter {
     // Attachments
     uploadAttachment(
         token: string,
-        attachment: { type: "image" | "video" | "file"; fileName: string; path: string; width?: number; height?: number; createdAt: number }
+        attachment: { type: "image" | "video" | "file"; fileName: string; path: string; width?: number; height?: number }
     ): Promise<ChitterError<ErrorUploadAttachment> | SuccessUploadAttachment>;
     removeAttachment(token: string, attachmentId: string): Promise<ChitterError<ErrorRemoveAttachment> | SuccessRemoveAttachment>;
 }

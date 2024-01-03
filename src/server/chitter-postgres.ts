@@ -120,7 +120,8 @@ export class PostgresChitterDatabase implements Chitter {
         this.cleanupCodesTimeout = setTimeout(() => this.cleanupCodes(), 3600000);
     }
 
-    close() {
+    async close() {
+        await this.pool.end();
         this.closed = true;
         clearTimeout(this.cleanupCodesTimeout);
     }

@@ -1,0 +1,5 @@
+# Dockerfile
+FROM postgres:16-alpine
+COPY postgres-entrypoint.sh /usr/local/bin/
+ENTRYPOINT ["postgres-entrypoint.sh"]
+CMD ["postgres"]

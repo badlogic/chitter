@@ -2,46 +2,54 @@ import * as fs from "fs";
 import { GenericContainer, StartedTestContainer } from "testcontainers";
 import { Environment } from "testcontainers/build/types";
 import { Api } from "../common/api";
-import { createApp, createAppFromPool } from "./app";
+import { createApp, createAppFromChitter, createAppFromPool } from "./app";
 import { assert, expect } from "chai";
 import { UserBasic } from "../common/common";
 import * as pgmem from "pg-mem";
+import { ChitterMem } from "./chitter-mem";
 
 describe("Integration Tests", function () {
     if (process.execArgv.some((arg) => arg.includes("--inspect"))) {
         this.timeout(0); // Disable timeout if debugger is attached
     }
 
-    const pgMem = true;
+    let appType: "pgmem" | "mem" | "pg" = "mem";
     let container: StartedTestContainer;
     let app: ReturnType<typeof createApp | typeof createAppFromPool>;
     const tmpUploadDir = "./tmp";
+    const shutdownToken = "shutdown-token";
     let stopApp: () => Promise<void>;
 
     before(async () => {
-        if (pgMem) {
-            const db = pgmem.newDb();
-            const client = db.adapters.createPg();
+        switch (appType) {
+            case "mem":
+                stopApp = await createAppFromChitter(new ChitterMem(), tmpUploadDir, shutdownToken);
+                break;
+            case "pgmem":
+                const db = pgmem.newDb();
+                const client = db.adapters.createPg();
 
-            stopApp = await createAppFromPool(new client.Pool(), tmpUploadDir);
-        } else {
-            const environment: Environment = {
-                POSTGRES_DB: "testdb",
-                POSTGRES_USER: "user",
-                POSTGRES_PASSWORD: "password",
-            };
+                stopApp = await createAppFromPool(new client.Pool(), tmpUploadDir, shutdownToken);
+                break;
+            case "pg":
+                const environment: Environment = {
+                    POSTGRES_DB: "testdb",
+                    POSTGRES_USER: "user",
+                    POSTGRES_PASSWORD: "password",
+                };
 
-            container = await new GenericContainer("postgres").withEnvironment(environment).withExposedPorts(5432).start();
+                container = await new GenericContainer("postgres").withEnvironment(environment).withExposedPorts(5432).start();
 
-            const dbConfig = {
-                host: container.getHost(),
-                user: "user",
-                password: "password",
-                name: "testdb",
-                port: container.getMappedPort(5432),
-            };
+                const dbConfig = {
+                    host: container.getHost(),
+                    user: "user",
+                    password: "password",
+                    name: "testdb",
+                    port: container.getMappedPort(5432),
+                };
 
-            stopApp = await createApp(dbConfig, tmpUploadDir);
+                stopApp = await createApp(dbConfig, tmpUploadDir, shutdownToken);
+                break;
         }
     });
 
@@ -193,6 +201,31 @@ describe("Integration Tests", function () {
         });
     });
 
+    it("Should edit a message", async () => {
+        const result = await Api.createRoomAndAdmin("room", "admin", true);
+        assert(result.success);
+        const { admin, generalChannel } = result.data;
+        const result2 = await Api.createMessage(
+            admin.token,
+            {
+                text: "Hello world",
+                facets: [],
+            },
+            generalChannel.id
+        );
+        assert(result2.success, JSON.stringify(result2));
+        const result3 = await Api.getMessages(admin.token, generalChannel.id);
+        assert(result3.success, JSON.stringify(result3));
+        assert(result3.data.length == 1);
+        delete (admin as any).token;
+        expect(result3.data[0]).to.deep.include({
+            id: result2.data.messageId,
+            user: admin,
+            content: { text: "Hello world", facets: [] },
+            channelId: generalChannel.id,
+        });
+    });
+
     it("Should page through messages", async () => {
         const result = await Api.createRoomAndAdmin("room", "admin", true);
         assert(result.success);
@@ -212,6 +245,7 @@ describe("Integration Tests", function () {
         for (let i = 0, j = 10; i < 10; i += 2, j -= 2) {
             const result3 = await Api.getMessages(admin.token, generalChannel.id, undefined, cursor, 2);
             assert(result3.success, JSON.stringify(result3));
+            console.log(result3.data);
             assert(result3.data.length == 2);
             expect(result3.data[0].content.text).to.equal(`message ${j}`);
             expect(result3.data[1].content.text).to.equal(`message ${j - 1}`);
