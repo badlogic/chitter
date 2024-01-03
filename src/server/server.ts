@@ -32,13 +32,13 @@ if (!shutdownToken) {
 
         const chitterMem = new ChitterMem({
             save: async (chitter) => {
-                console.log("Saving Chitter memory database to docker/data/mem.json");
+                console.log("Saving in-memory database to docker/data/mem.json");
                 fs.writeFileSync("docker/data/mem.json", JSON.stringify(chitter.serialize()), "utf-8");
                 console.log("Saved, size: " + (fs.statSync("docker/data/mem.json").size / (1024 * 1024)).toFixed(2) + "MB");
             },
             load: async () => {
                 if (fs.existsSync("docker/data/mem.json")) {
-                    console.log("Restoring Chitter memory database");
+                    console.log("Restoring in-memory database from docker/data/mem.json");
                     return JSON.parse(fs.readFileSync("docker/data/mem.json", "utf-8")) as SerializedMemRoom[];
                 } else {
                     return [];

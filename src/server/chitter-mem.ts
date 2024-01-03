@@ -179,6 +179,9 @@ export class ChitterMem implements Chitter {
     tokenToUser = new Map<string, User>();
     inviteCodes = new Map<string, { roomId: string; expiresAt: Date }>();
     transferCodes = new Map<string, { userTokens: string[]; expiresAt: Date }>();
+    persistanceTimeout: any;
+    cleanupCodesTimeout: any;
+    closed = false;
 
     constructor(readonly persistance?: { save: (chitter: ChitterMem) => Promise<void>; load: () => Promise<SerializedMemRoom[]> }) {}
 
@@ -192,10 +195,47 @@ export class ChitterMem implements Chitter {
                     this.tokenToUser.set(user.token, user);
                 }
             }
+            this.persist();
+        }
+
+        this.cleanupCodes();
+    }
+
+    private persist() {
+        if (this.closed || !this.persistance) return;
+        try {
+            this.persistance.save(this);
+        } catch (e) {
+            console.error("Couldn't persist in-memory database", e);
+        } finally {
+            setTimeout(() => this.persist(), 1000 * 60);
         }
     }
 
+    private cleanupCodes() {
+        if (this.closed) return;
+        const now = new Date();
+
+        // Cleanup transfer codes (expire after 1 hour)
+        this.transferCodes.forEach((value, key) => {
+            if (value.expiresAt < now) {
+                this.transferCodes.delete(key);
+            }
+        });
+
+        // Cleanup invite codes (expire after 24 hours)
+        this.inviteCodes.forEach((value, key) => {
+            if (value.expiresAt < now) {
+                this.inviteCodes.delete(key);
+            }
+        });
+        this.cleanupCodesTimeout = setTimeout(() => this.cleanupCodes(), 3600000);
+    }
+
     async close() {
+        this.closed = true;
+        clearTimeout(this.cleanupCodesTimeout);
+        clearTimeout(this.persistanceTimeout);
         if (this.persistance) {
             await this.persistance.save(this);
         }
